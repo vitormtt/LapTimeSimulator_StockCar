@@ -12,7 +12,7 @@ from simulation import run_bicycle_model
 
 DATA_PATH = r"C:\Users\vitor\OneDrive\Desktop\Pastas\LapTimeSimulator_CopaTruck\data\tracks"
 RESULTS_PATH = r"C:\Users\vitor\OneDrive\Desktop\Pastas\LapTimeSimulator_CopaTruck\results"
-MODELS_PATH = "src/vehicle_models.json"
+MODELS_PATH = "data/vehicle_models.json"
 os.makedirs(RESULTS_PATH, exist_ok=True)
 
 def load_vehicle_models():
