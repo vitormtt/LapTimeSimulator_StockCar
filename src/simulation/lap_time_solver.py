@@ -107,24 +107,32 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     consumo_acum = np.zeros(n)
     
     # PILAR 1: GGV DIAGRAM (Aerodinâmica Dinâmica)
-    # A velocidade limite em cada curva agora depende do Downforce gerado pela própria velocidade
-    # V_max = sqrt((mu * m * g) / (m/R - 0.5 * rho * Cl * A * mu))
     v_lat_max_profile = np.zeros(n)
     for i in range(n):
         denominador = (truck.mass / radius[i]) - (0.5 * rho * Cl * A_front * mu_aderencia)
         if denominador > 0:
             v_lat_max_profile[i] = np.sqrt((mu_aderencia * truck.mass * g) / denominador)
         else:
-            v_lat_max_profile[i] = 150.0 / 3.6 # Se downforce infinito, limita velocidade terminal
+            v_lat_max_profile[i] = 200.0 / 3.6 # Se downforce infinito, limita velocidade terminal
     
     # FORWARD PASS (Aceleração)
-    v_profile[0] = min(10.0, v_lat_max_profile[0]) 
-    gear_profile[0] = 1
+    # Lógica de largada: Caminhões de corrida costumam largar na faixa de 60km/h a 80km/h (rolling start) 
+    # ou de 4ª/5ª marcha. Aqui vamos iniciar com v0 realista de rolling start (ex: 20 m/s ~ 72 km/h)
+    start_speed = 20.0
+    v_profile[0] = min(start_speed, v_lat_max_profile[0]) 
+    
+    # A velocidade máxima teórica do caminhão usando a última marcha real (ex: índice 12)
+    num_gears = len(truck.transmission.gear_ratios)
+    highest_gear_ratio = truck.transmission.get_total_ratio(num_gears)
+    absolute_v_rpm_limit = (truck.engine.redline_rpm * 2 * np.pi * truck.brakes.wheel_radius) / (60 * highest_gear_ratio)
     
     for i in range(1, n):
         v_prev = v_profile[i-1]
         
+        # Garante que a marcha escolhida num caminhão de corrida não caia para as de força absurda de arrancada (1-3)
         gear_current = truck.transmission.select_optimal_gear(v_prev, truck.brakes.wheel_radius)
+        if gear_current < 4:
+            gear_current = 4
         gear_profile[i] = gear_current
         
         ratio_total = truck.transmission.get_total_ratio(gear_current)
@@ -147,13 +155,14 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         F_traction_actual = min(F_traction, max_traction_grip)
         
         a = (F_traction_actual - F_drag) / truck.mass
-        a_long[i-1] = a
+        # Limita aceleração a um valor fisicamente possível para não explodir
+        if a > 15.0: a = 15.0
         
-        v_rpm_limit = (truck.engine.redline_rpm * 2 * np.pi * truck.brakes.wheel_radius) / (60 * truck.transmission.get_total_ratio(truck.transmission.gear_ratios[-1]))
+        a_long[i-1] = a
         
         if ds[i] > 0:
             v_possible = np.sqrt(max(0, v_prev**2 + 2 * a * ds[i]))
-            v_profile[i] = min(v_possible, v_lat_max_profile[i], v_rpm_limit)
+            v_profile[i] = min(v_possible, v_lat_max_profile[i], absolute_v_rpm_limit)
         else:
             v_profile[i] = v_prev
             
@@ -168,7 +177,7 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         F_normal_next = (truck.mass * g) + F_downforce_next
         a_total_available = (mu_aderencia * F_normal_next) / truck.mass
         
-        # Sobra aderência para frear? (Kamm's Circle)
+        # Sobra aderência para frear? (Kamm's Circle / Friction Circle)
         a_decel_max_friction = np.sqrt(max(0, a_total_available**2 - a_lat_next**2))
         
         # Limitado pelo Brake System físico
