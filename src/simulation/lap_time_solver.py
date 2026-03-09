@@ -3,8 +3,10 @@ Simulador de Lap Time para Caminhão Copa Truck
 Modelo Bicicleta 2-DOF (Modular) + Aceleração/Frenagem + Motor + Aerodinâmica
 
 IMPLEMENTAÇÕES AVANÇADAS:
-- Fase 1: Suavização de Trajetória (Savitzky-Golay) para eliminar ruído derivativo.
+- Fase 1: Suavização de Trajetória (Savitzky-Golay).
 - Fase 2: Transferência de Carga Longitudinal (Pitch / Squat / Dive).
+- Fase 3: Shift Time Penalty (Atraso transiente de troca de marcha).
+- Fase 4: Exportação padronizada MoTec/PiToolbox.
 """
 import numpy as np
 import pandas as pd
@@ -55,7 +57,6 @@ def build_modular_truck_from_dict(params_dict: dict) -> BicycleVehicle2DOF:
         'pacejka_c_y': 1.3
     })
     
-    # Parâmetros geométricos para a Transferência de Carga
     lf = params_dict.get('lf', 2.1)
     lr = params_dict.get('lr', 2.3)
     
@@ -83,12 +84,10 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     A_front = params_dict.get('A_front', 8.7)
     Cl = params_dict.get('Cl', 0.0)
     
-    # FASE 1: SUAVIZAÇÃO DA PISTA (Track Smoothing)
     x_raw = circuit.centerline_x
     y_raw = circuit.centerline_y
     n = len(x_raw)
     
-    # Filtro Savitzky-Golay para eliminar ruídos derivados da malha bruta de GPS/Geração
     window_size = min(51, n // 4)
     if window_size % 2 == 0: window_size += 1
     
@@ -107,7 +106,6 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     ddx = np.gradient(dx)
     ddy = np.gradient(dy)
     
-    # Curvatura e Raio mais estáveis agora!
     curvature = (dx * ddy - dy * ddx) / (dx**2 + dy**2 + 1e-6)**1.5
     radius = np.where(np.abs(curvature) > 1e-6, 1.0 / np.abs(curvature), 1e6)
     radius = np.clip(radius, 10.0, 1e6)
@@ -124,7 +122,6 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     L = truck.wheelbase
     h = truck.cg_height
     
-    # Limite estático puro para primeira aproximação
     v_lat_max_profile = np.zeros(n)
     for i in range(n):
         denominador = (truck.mass / radius[i]) - (0.5 * rho * Cl * A_front * mu_aderencia)
@@ -137,16 +134,33 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     highest_gear_ratio = truck.transmission.get_total_ratio(num_gears)
     absolute_v_rpm_limit = (truck.engine.redline_rpm * 2 * np.pi * truck.brakes.wheel_radius) / (60 * highest_gear_ratio)
     
-    # FORWARD PASS (Aceleração com Transferência de Carga Dinâmica para Traseira - Squat)
+    # FORWARD PASS
     start_speed = 20.0
     v_profile[0] = min(start_speed, v_lat_max_profile[0]) 
     
+    # Parâmetros de Transiente de Marcha (Shift Penalty)
+    shift_time_s = config.get("shift_time_s", 0.4) # Atraso de 400ms na embreagem da Copa Truck
+    shift_cooldown_dist = 0.0
+    
     for i in range(1, n):
         v_prev = v_profile[i-1]
-        a_prev = a_long[i-2] if i > 1 else 0.0 # Aceleração do frame anterior para estimar o Pitch
+        a_prev = a_long[i-2] if i > 1 else 0.0
         
-        gear_current = truck.transmission.select_optimal_gear(v_prev, truck.brakes.wheel_radius)
-        if gear_current < 4: gear_current = 4
+        gear_ideal = truck.transmission.select_optimal_gear(v_prev, truck.brakes.wheel_radius)
+        if gear_ideal < 4: gear_ideal = 4
+        
+        # Verifica se pediu para subir marcha
+        if gear_ideal > gear_profile[i-1] and shift_cooldown_dist <= 0:
+            shift_cooldown_dist = v_prev * shift_time_s # Transforma o atraso de tempo num atraso espacial
+            
+        is_shifting = False
+        if shift_cooldown_dist > 0:
+            gear_current = gear_profile[i-1] # Mantém marcha anterior engatada no log
+            shift_cooldown_dist -= ds[i]
+            is_shifting = True
+        else:
+            gear_current = gear_ideal
+            
         gear_profile[i] = gear_current
         
         ratio_total = truck.transmission.get_total_ratio(gear_current)
@@ -161,26 +175,24 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         F_drag = 0.5 * rho * Cx * A_front * v_prev**2
         F_downforce = 0.5 * rho * Cl * A_front * v_prev**2
         
-        # FASE 2: Transferência de Carga (Pitch - Aceleração levanta a frente e senta a traseira)
-        # Fz_rear_static = m * g * (lf / L)
-        # Delta_Fz = m * ax * (h / L)
         Fz_rear_static = truck.mass * g * (lf / L)
         Delta_Fz = truck.mass * a_prev * (h / L)
-        
-        # A carga traseira recebe o downforce focado no eixo (simplificado 50/50 do df) e o delta do Pitch
         Fz_rear_dynamic = Fz_rear_static + Delta_Fz + (F_downforce * 0.5)
         
-        # A aderência de tração agora foca apenas nos pneus traseiros (RWD) batendo no asfalto com a carga dinâmica
         max_rear_grip = mu_aderencia * Fz_rear_dynamic
         F_lateral = truck.mass * (v_prev**2 / radius[i])
         
-        # Se as rodas de trás têm que fazer curva, sobra menos aderência pra acelerar
-        if max_rear_grip > F_lateral * 0.5: # 50% do esforço lateral vai pra traseira
+        if max_rear_grip > F_lateral * 0.5: 
             available_long_grip = np.sqrt(max_rear_grip**2 - (F_lateral * 0.5)**2)
         else:
             available_long_grip = 0.0
             
-        F_traction_actual = min(F_traction_engine, available_long_grip)
+        if is_shifting:
+            # Durante a troca de marcha a tração é cortada a zero
+            F_traction_actual = 0.0
+        else:
+            F_traction_actual = min(F_traction_engine, available_long_grip)
+            
         a = (F_traction_actual - F_drag) / truck.mass
         
         if a > 8.0: a = 8.0
@@ -192,25 +204,20 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         else:
             v_profile[i] = v_prev
             
-    # BACKWARD PASS (Frenagem com Transferência de Carga para Frente - Dive)
+    # BACKWARD PASS
     v_profile[-1] = min(v_profile[-1], v_lat_max_profile[-1])
     for i in reversed(range(n-1)):
         v_next = v_profile[i+1]
         
-        # Assume-se desaceleração do limite estático como semente para o cálculo de transferência (Dive)
         a_lat_next = v_next**2 / radius[i+1]
         F_lateral_next = truck.mass * a_lat_next
         F_downforce_next = 0.5 * rho * Cl * A_front * v_next**2
         
-        # Estimativa de desaceleração máxima puramente aderente para gerar o Delta Fz
         a_decel_est = mu_aderencia * g 
         Delta_Fz_brake = truck.mass * a_decel_est * (h / L)
         
-        # Fz_front_static = m * g * (lr / L)
         Fz_front_dynamic = (truck.mass * g * (lr / L)) + Delta_Fz_brake + (F_downforce_next * 0.5)
         Fz_rear_dynamic  = (truck.mass * g * (lf / L)) - Delta_Fz_brake + (F_downforce_next * 0.5)
-        
-        # O pneu não pode ter carga negativa (levantar do chão)
         Fz_rear_dynamic = max(Fz_rear_dynamic, 0.0)
         
         max_front_grip = mu_aderencia * Fz_front_dynamic
@@ -224,7 +231,6 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
             
         a_decel_max_friction = available_brake_grip / truck.mass
         a_decel_max_system = truck.brakes.get_max_deceleration(v_next, Fz_front_dynamic, Fz_rear_dynamic)
-        
         a_decel_brakes = min(a_decel_max_friction, a_decel_max_system)
         
         a_drag_next = (0.5 * rho * Cx * A_front * v_next**2) / truck.mass
@@ -236,11 +242,10 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
             v_brake_limit = np.sqrt(v_next**2 + 2 * a_decel_effective * ds[i+1])
             v_profile[i] = min(v_profile[i], v_brake_limit)
             
-    # TIME E CONSUMO PASS (Atualiza Acelerações Finais)
+    # TIME E CONSUMO PASS
     time_profile = np.zeros(n)
     for i in range(n):
         a_lat[i] = v_profile[i]**2 / radius[i]
-        
         if i < n-1:
             a_long[i] = (v_profile[i+1]**2 - v_profile[i]**2) / (2 * ds[i+1] if ds[i+1] > 0 else 1)
             
@@ -276,15 +281,24 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         "compute_time_s": elapsed
     }
     
+    # Exportação nos padrões de nomes da PiToolbox / MoTec
     if save_csv and out_path:
         temp_pneu = np.ones(n) * 65.0 
         result["temp_pneu"] = temp_pneu
         
         df = pd.DataFrame({
-            "distance_m": s, "x_m": x, "y_m": y, "v_kmh": v_profile * 3.6,
-            "a_long_ms2": a_long, "a_lat_ms2": a_lat, "gear": gear_profile,
-            "rpm": rpm_profile, "radius_m": radius, "time_s": time_profile,
-            "consumo_l": consumo_acum, "temp_pneu_c": temp_pneu
+            "Distance": s, 
+            "Speed": v_profile * 3.6,
+            "G_Long": a_long / g, 
+            "G_Lat": a_lat / g, 
+            "Gear": gear_profile,
+            "Engine_RPM": rpm_profile, 
+            "Time": time_profile,
+            "Fuel_Cons_Accum": consumo_acum, 
+            "Tyre_Temp_C": temp_pneu,
+            "Throttle": np.where(a_long > 0, 100.0, 0.0), # Canal Proxy para o Dashboard
+            "Brake_Press": np.where(a_long < -0.5, 100.0, 0.0), # Canal Proxy para o Dashboard
+            "Radius": radius
         })
         df.to_csv(out_path, index=False)
         
