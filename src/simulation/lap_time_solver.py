@@ -242,8 +242,15 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         # Math Channel: Estimativa de Slip Angle Dianteiro Simplificado (Graus)
         # alpha = F_lat / Cornering_Stiffness
         Fy_front = (truck.mass * a_lat[i] * lr) / L
-        cf_total = truck.tires.pacejka_c_y * 100000.0 # Aproximação grosseira para visualização
-        slip_angle_est[i] = np.degrees(Fy_front / cf_total) * sinal_curva
+        # Verifica se o modelo de pneu tem o atributo C_y (Pacejka) ou se é Linear
+        if hasattr(truck.tires, 'C_y'):
+            cf_total = truck.tires.B_y * truck.tires.C_y * truck.tires.D_y * Fz_estatico_roda
+        elif hasattr(truck.tires, 'cornering_stiffness'):
+            cf_total = truck.tires.cornering_stiffness
+        else:
+            cf_total = 100000.0 # fallback seguro
+
+        slip_angle_est[i] = np.degrees(Fy_front / (cf_total + 1.0)) * sinal_curva
         
         if i < n-1:
             a_long[i] = (v_profile[i+1]**2 - v_profile[i]**2) / (2 * ds[i+1] if ds[i+1] > 0 else 1)
