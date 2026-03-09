@@ -56,7 +56,7 @@ def build_modular_truck_from_dict(params_dict: dict) -> BicycleVehicle2DOF:
     
     # Parâmetros de Rolagem do Copa Truck
     track_width = params_dict.get('track_width', 2.45) 
-    k_roll = params_dict.get('k_roll', 450000.0) # Truck tem rigidez de rolagem altíssima na barra estabilizadora
+    k_roll = params_dict.get('k_roll', 450000.0)
     
     return BicycleVehicle2DOF(
         mass=params_dict.get('m', 5000.0),
@@ -116,7 +116,9 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     gear_profile = np.ones(n, dtype=int)
     rpm_profile = np.zeros(n)
     consumo_acum = np.zeros(n)
-    roll_angle_profile = np.zeros(n) # NOVO CANAL PI TOOLBOX
+    roll_angle_profile = np.zeros(n)
+    fz_outer_profile = np.zeros(n) # NOVO CANAL MATEMATICO
+    slip_angle_est = np.zeros(n)   # NOVO CANAL MATEMATICO
     
     lf = truck.a
     lr = truck.wheelbase - lf
@@ -135,7 +137,7 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     highest_gear_ratio = truck.transmission.get_total_ratio(num_gears)
     absolute_v_rpm_limit = (truck.engine.redline_rpm * 2 * np.pi * truck.brakes.wheel_radius) / (60 * highest_gear_ratio)
     
-    # FORWARD PASS - Aceleração 
+    # FORWARD PASS 
     start_speed = 20.0
     v_profile[0] = min(start_speed, v_lat_max_profile[0]) 
     
@@ -222,23 +224,34 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
             v_brake_limit = np.sqrt(v_next**2 + 2 * a_decel_effective * ds[i+1])
             v_profile[i] = min(v_profile[i], v_brake_limit)
             
-    # TIME E CONSUMO PASS (AGORA INCLUI CÁLCULO DE ROLL 3-DOF)
+    # TIME E CONSUMO PASS (AGORA INCLUI CÁLCULO DE ROLL 3-DOF E SLIP ANGLE MATH CHANNEL)
     time_profile = np.zeros(n)
+    time_acc = 0.0 # Acumulador real de tempo para o CSV
+    
     for i in range(n):
         a_lat[i] = v_profile[i]**2 / radius[i]
         
-        # Calcula a Rolagem (3-DOF) da Cabine baseada no G Lateral instantâneo
         roll_data = truck.calculate_roll_transfer(a_lat[i])
-        # Aqui podemos multiplicar pelo sinal da curvatura para saber se é curva p/ direita ou esquerda
         sinal_curva = np.sign(curvature[i]) if curvature[i] != 0 else 1.0
         roll_angle_profile[i] = roll_data['roll_angle_deg'] * sinal_curva
+        
+        # Math Channel: Força Normal no pneu externo (Soma do estático + delta de transferência)
+        Fz_estatico_roda = (truck.mass * g) / 4.0
+        fz_outer_profile[i] = Fz_estatico_roda + roll_data['delta_fz_lat']
+        
+        # Math Channel: Estimativa de Slip Angle Dianteiro Simplificado (Graus)
+        # alpha = F_lat / Cornering_Stiffness
+        Fy_front = (truck.mass * a_lat[i] * lr) / L
+        cf_total = truck.tires.pacejka_c_y * 100000.0 # Aproximação grosseira para visualização
+        slip_angle_est[i] = np.degrees(Fy_front / cf_total) * sinal_curva
         
         if i < n-1:
             a_long[i] = (v_profile[i+1]**2 - v_profile[i]**2) / (2 * ds[i+1] if ds[i+1] > 0 else 1)
             
         if i > 0 and v_profile[i] > 0:
             dt = ds[i] / v_profile[i]
-            time_profile[i] = time_profile[i-1] + dt
+            time_acc += dt
+            time_profile[i] = time_acc
             
             F_drag_inst = 0.5 * rho * Cx * A_front * v_profile[i]**2
             F_traction_req = truck.mass * max(0, a_long[i]) + F_drag_inst
@@ -249,6 +262,8 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
                 consumo_acum[i] = consumo_acum[i-1] + consumo_seg
             else:
                 consumo_acum[i] = consumo_acum[i-1]
+        elif i == 0:
+            time_profile[i] = 0.0
                 
     lap_time = time_profile[-1]
     elapsed = time.time() - start_time
@@ -263,6 +278,7 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         "gear": gear_profile,
         "rpm": rpm_profile,
         "radius": radius,
+        "roll_angle_profile": roll_angle_profile,
         "time": time_profile,
         "consumo": consumo_acum,
         "compute_time_s": elapsed
@@ -273,20 +289,24 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         temp_pneu = np.ones(n) * 65.0 
         result["temp_pneu"] = temp_pneu
         
+        # Adequando chaves ao formato PiToolbox/MoTec comum:
+        # Distance (m), Speed (km/h), Corr_Accel (G), Lat_Accel (G), Gear, Engine_RPM, Throttle_Pos, Brake_Press
         df = pd.DataFrame({
             "Distance": s, 
+            "Time": time_profile,
             "Speed": v_profile * 3.6,
+            "Engine_RPM": rpm_profile, 
+            "Gear": gear_profile,
             "G_Long": a_long / g, 
             "G_Lat": a_lat / g, 
-            "Gear": gear_profile,
-            "Engine_RPM": rpm_profile, 
-            "Roll_Angle_deg": roll_angle_profile, 
-            "Time": time_profile,
-            "Fuel_Cons_Accum": consumo_acum, 
-            "Tyre_Temp_C": temp_pneu,
-            "Throttle": np.where(a_long > 0, 100.0, 0.0), 
+            "Throttle_Pos": np.where(a_long > 0, 100.0, 0.0), 
             "Brake_Press": np.where(a_long < -0.5, 100.0, 0.0),
-            "Radius": radius
+            "Roll_Angle_deg": roll_angle_profile, 
+            "Fz_Outer_Wheel_N": fz_outer_profile,
+            "Front_Slip_Angle_deg": slip_angle_est,
+            "Fuel_Cons_Accum_L": consumo_acum, 
+            "Tyre_Temp_C": temp_pneu,
+            "Corner_Radius_m": radius
         })
         df.to_csv(out_path, index=False)
         

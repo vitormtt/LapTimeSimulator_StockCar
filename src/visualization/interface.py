@@ -174,61 +174,108 @@ def resultados_page():
     res = st.session_state.resultados
     csv_file = st.session_state.csv_path
 
-    # Top KPIs
+    # Advanced KPIs (Math Channels)
+    # Extrai do dicionário para fácil cálculo
+    v_kmh = res['v_profile'] * 3.6
+    a_long_g = res['a_long'] / 9.81
+    a_lat_g = res['a_lat'] / 9.81
+    
+    time_w_full_throttle = np.sum(np.where(a_long_g > 0.1, 1, 0)) / len(a_long_g) * 100
+    time_braking = np.sum(np.where(a_long_g < -0.2, 1, 0)) / len(a_long_g) * 100
+    time_coasting = np.sum(np.where((a_long_g >= -0.2) & (a_long_g <= 0.1), 1, 0)) / len(a_long_g) * 100
+    
+    max_lat_g = np.max(np.abs(a_lat_g))
+    max_braking_g = np.min(a_long_g)
+    max_roll_angle = np.max(np.abs(res['roll_angle_profile'])) if 'roll_angle_profile' in res else 0.0
+
+    st.subheader("🏁 Performance KPIs")
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("Lap time", f"{res['lap_time']:.2f} s")
-    with col2: st.metric("V. Max", f"{np.max(res['v_profile']) * 3.6:.1f} km/h")
-    with col3: st.metric("Max Lat G", f"{np.max(np.abs(res['a_lat']))/9.81:.2f} G")
-    with col4: st.metric("Fuel Used", f"{np.max(res['consumo']):.2f} L")
+    with col1: 
+        st.metric("Lap Time", f"{res['lap_time']:.2f} s")
+        st.metric("Max Speed", f"{np.max(v_kmh):.1f} km/h")
+        st.metric("Avg Speed", f"{np.mean(v_kmh):.1f} km/h")
+    with col2: 
+        st.metric("Time @ WOT", f"{time_w_full_throttle:.1f} %", help="Wide Open Throttle")
+        st.metric("Time Braking", f"{time_braking:.1f} %")
+        st.metric("Time Coasting", f"{time_coasting:.1f} %")
+    with col3: 
+        st.metric("Peak Cornering G", f"{max_lat_g:.2f} G")
+        st.metric("Peak Braking G", f"{abs(max_braking_g):.2f} G")
+        st.metric("Peak Accel G", f"{np.max(a_long_g):.2f} G")
+    with col4: 
+        st.metric("Fuel Used", f"{np.max(res['consumo']):.2f} L")
+        st.metric("Peak Cabin Roll", f"{max_roll_angle:.2f} °")
+        st.metric("Gear Shifts", f"{np.sum(np.abs(np.diff(res['gear'])))}", help="Total de trocas de marcha na volta")
     
     st.markdown("---")
     
-    # Download Button para o CSV
+    # Download Button Formatado
     if csv_file and os.path.exists(csv_file):
         with open(csv_file, "rb") as f:
             st.download_button(
-                label="📥 Download Telemetry CSV (PiToolbox / MoTec format)",
+                label="📥 Baixar Telemetria Completa (.CSV) para PiToolbox/MoTeC",
                 data=f,
-                file_name=os.path.basename(csv_file),
+                file_name=f"CopaTruck_Sim_{datetime.now().strftime('%H%M%S')}.csv",
                 mime="text/csv",
-                type="primary"
+                type="primary",
+                help="Este arquivo contém todos os Math Channels (G_Lat, G_Long, Speed, Yaw, Slip_Angle, etc.) padronizados para softwares de engenharia."
             )
             
     st.markdown("---")
     st.subheader("📈 Telemetry Charts")
 
-    # Primeira Linha de Gráficos (Velocidade e Aceleração Lateral)
+    # Primeira Linha
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         fig_v = go.Figure()
-        fig_v.add_trace(go.Scattergl(x=res['distance'], y=res['v_profile']*3.6, mode="lines", name="Speed", line=dict(color="blue", width=2)))
+        fig_v.add_trace(go.Scattergl(x=res['distance'], y=v_kmh, mode="lines", name="Speed", line=dict(color="blue", width=2)))
         fig_v.update_layout(title="Speed (km/h)", margin=dict(l=0, r=0, t=30, b=0), height=300)
         st.plotly_chart(fig_v)
 
     with col_g2:
         fig_a = go.Figure()
-        fig_a.add_trace(go.Scattergl(x=res['distance'], y=res['a_lat']/9.81, mode="lines", name="Lat G", line=dict(color="red", width=2)))
+        fig_a.add_trace(go.Scattergl(x=res['distance'], y=a_lat_g, mode="lines", name="Lat G", line=dict(color="red", width=2)))
         fig_a.update_layout(title="Lateral Accel (G)", margin=dict(l=0, r=0, t=30, b=0), height=300)
         st.plotly_chart(fig_a)
         
-    # Segunda Linha de Gráficos (Aceleração Longitudinal e Roll Angle do 3-DOF)
+    # Segunda Linha
     col_g3, col_g4 = st.columns(2)
     with col_g3:
         fig_long = go.Figure()
-        fig_long.add_trace(go.Scattergl(x=res['distance'], y=res['a_long']/9.81, mode="lines", name="Long G", line=dict(color="orange", width=2)))
+        fig_long.add_trace(go.Scattergl(x=res['distance'], y=a_long_g, mode="lines", name="Long G", line=dict(color="orange", width=2)))
         fig_long.update_layout(title="Longitudinal Accel (G)", margin=dict(l=0, r=0, t=30, b=0), height=300)
         st.plotly_chart(fig_long)
         
     with col_g4:
-        # Puxa o Roll_Angle_deg do CSV/Modelo para provar o 3-DOF funcionando
-        if 'Roll_Angle_deg' in pd.read_csv(csv_file).columns:
-            df_temp = pd.read_csv(csv_file)
+        if 'roll_angle_profile' in res:
             fig_roll = go.Figure()
-            fig_roll.add_trace(go.Scattergl(x=df_temp['Distance'], y=df_temp['Roll_Angle_deg'], mode="lines", name="Roll Angle", line=dict(color="purple", width=2)))
+            fig_roll.add_trace(go.Scattergl(x=res['distance'], y=res['roll_angle_profile'], mode="lines", name="Roll Angle", line=dict(color="purple", width=2)))
             fig_roll.update_layout(title="Cabin Roll Angle (degrees) [3-DOF]", margin=dict(l=0, r=0, t=30, b=0), height=300)
             st.plotly_chart(fig_roll)
         else:
-            st.info("Simulação anterior não continha o módulo 3-DOF. Rode a simulação novamente.")
+            st.info("Dado de Roll não disponível.")
+            
+    # Terceira Linha - RPM e Marcha (GGV Combinado)
+    st.markdown("---")
+    st.subheader("⚙️ Powertrain & GGV")
+    col_g5, col_g6 = st.columns(2)
+    with col_g5:
+        fig_rpm = go.Figure()
+        fig_rpm.add_trace(go.Scattergl(x=res['distance'], y=res['rpm'], mode="lines", name="RPM", line=dict(color="green", width=2)))
+        fig_rpm.add_trace(go.Scattergl(x=res['distance'], y=res['gear']*200, mode="lines", name="Gear (*200)", line=dict(color="grey", width=1, dash='dash')))
+        fig_rpm.update_layout(title="Engine RPM & Gear", margin=dict(l=0, r=0, t=30, b=0), height=300)
+        st.plotly_chart(fig_rpm)
+        
+    with col_g6:
+        # GGV Diagram
+        fig_ggv = go.Figure()
+        fig_ggv.add_trace(go.Scatter(x=a_lat_g, y=a_long_g, mode='markers', marker=dict(size=4, color=v_kmh, colorscale='Viridis', showscale=True, colorbar=dict(title="Speed"))))
+        fig_ggv.update_layout(title="GGV Diagram (Friction Circle)", xaxis_title="Lat G", yaxis_title="Long G", width=400, height=400, yaxis_range=[-1.2, 1.2], xaxis_range=[-1.2, 1.2])
+        # Traçar o círculo teórico
+        theta = np.linspace(0, 2*np.pi, 100)
+        mu = st.session_state.config["coef_aderencia"]
+        fig_ggv.add_trace(go.Scatter(x=mu*np.cos(theta), y=mu*np.sin(theta), mode='lines', line=dict(color='red', dash='dash'), name='Friction Limit'))
+        st.plotly_chart(fig_ggv)
 
 PAGES = {
     "Parameters": parametros_veiculo_page,
