@@ -40,7 +40,6 @@ class BicycleVehicle2DOF(VehicleModel):
         No modelo QSS espacial, as derivadas laterais são forçadas pelo raio,
         então aqui retornamos a capacidade limite motriz.
         """
-        # CORREÇÃO: O método correto na classe ICEEngine é get_max_torque
         torque_motor = self.engine.get_max_torque(current_rpm) * throttle
         
         ratio = self.transmission.get_total_ratio(
@@ -49,7 +48,11 @@ class BicycleVehicle2DOF(VehicleModel):
         torque_roda = torque_motor * ratio * self.transmission.efficiency
         
         Fx_traction = torque_roda / self.brakes.wheel_radius
-        Fx_brake = self.brakes.get_brake_torque(brake_pedal) / self.brakes.wheel_radius
+        
+        # CORREÇÃO: O sistema de freios retorna um dicionário de forças ('front', 'rear', 'total')
+        brake_forces = self.brakes.get_brake_force(brake_pedal, self.vx)
+        Fx_brake = brake_forces['total']
+        
         Fx_total = Fx_traction - Fx_brake
         
         return {
