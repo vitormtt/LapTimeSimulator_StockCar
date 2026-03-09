@@ -1,220 +1,49 @@
-# 🏁 LapTimeSimulator_CopaTruck
+# LapTimeSimulator_CopaTruck 🏁🚛
 
-Simulador de lap time para Copa Truck com modelo de dinâmica veicular 2DOF (bicycle model), interface web interativa e suporte para circuitos reais.
+Simulador de Tempo de Volta (Lap Time Simulator) desenvolvido para veículos de competição do tipo **Copa Truck**, com foco em análise de desempenho dinâmico em ambientes virtuais controlados.
 
-A engenharia automotiva moderna exige simulações eficientes para analisar o desempenho dinâmico. Em competições de caminhões como a Copa Truck, otimizar o tempo de volta é vital para validar técnicas, refinar estratégias e inovar.
+*Projeto vinculado ao Mestrado em Engenharia Automotiva (UnB) - Foco em Dinâmica Veicular e Simulação Computacional.*
 
-## ✨ Características
+## 🛠️ Arquitetura e Física do Modelo
+O simulador utiliza uma abordagem **Quasi-Steady-State (QSS)** baseada na integração Forward-Backward e no modelo de **Bicicleta (2-DOF)**, expandido com cálculos dinâmicos avançados:
 
-- **Modelo Dinâmico 2DOF**: Bicycle model com aceleração/frenagem longitudinal e lateral
-- **Motor Diesel Realista**: Curva de torque calibrada para caminhões de corrida
-- **Transmissão Multi-Marcha**: Seleção automática de marcha otimizada (até 16 marchas)
-- **Aerodinâmica**: Arrasto e downforce configuráveis
-- **Pneus**: Modelo de aderência com círculo de força e temperatura simplificada
-- **Circuitos Reais**: Suporte para HDF5 e integração com TUM FTM Database
-- **Interface Web**: Streamlit para configuração, simulação e análise interativa
-- **Telemetria Completa**: Velocidade, aceleração, marcha, RPM, temperatura, consumo
+* **Diagrama GGV Dinâmico Acoplado**: Cálculo de limites de aderência (Friction Circle) considerando *Downforce* e Arrasto Aerodinâmico atuando iterativamente na Força Normal ($F_z$).
+* **Transferência de Carga Longitudinal**: Modulação dinâmica de *Pitch* (*Squat* em aceleração e *Dive* em frenagem) alterando a aderência disponível nos eixos traseiro e dianteiro.
+* **Powertrain Modular**: Modelagem realista de Curvas de Torque para Motor Diesel 12L, relações de transmissão limitadas a parâmetros de corrida (rolling start/4ª marcha), e mapa de consumo de combustível termodinâmico.
+* **Frenagem Pneumática**: Limitadores mecânicos baseados em câmaras de ar reais e distribuição de freio (Brake Balance 60/40).
+* **Tratamento de Trajetória**: Suavização de malha via filtro *Savitzky-Golay* para mitigação de picos derivativos em pistas geradas por dados de GPS/OSM reais.
 
-## 🚀 Início Rápido
+## 🚀 Instalação e Execução
 
-### Instalação
-
-```bash
-# Clone o repositório
+### 1. Clonar o repositório
+```powershell
 git clone https://github.com/vitormtt/LapTimeSimulator_CopaTruck.git
 cd LapTimeSimulator_CopaTruck
-
-# Crie o ambiente virtual
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-
-# Instale as dependências
-pip install -r requirements.txt
 ```
 
-### Executar Interface
+### 2. Sincronizar as Dependências
+O projeto conta com um ecossistema padronizado de Data Science e UI. Para instalar ou atualizar todas as bibliotecas necessárias, execute:
+```powershell
+pip install --upgrade -r requirements.txt
+```
 
-```bash
+### 3. Pistas (Opcional)
+Na ausência de malhas GPS/OSM brutas mapeadas na sua máquina, você pode gerar pistas sintéticas dimensionadas para validar o motor do simulador:
+```powershell
+python src/tracks/generate_br_tracks.py
+```
+
+### 4. Iniciar a Interface
+Para abrir o Dashboard interativo (Streamlit):
+```powershell
 streamlit run src/visualization/interface.py
 ```
 
-Acesse no navegador: **http://localhost:8501**
-
-## 📖 Como Usar
-
-### 1. **Selecionar Circuito** 🏁
-- Navegue para página "Track"
-- Escolha um circuito da pasta `tracks/` (ex: `interlagos.hdf5`)
-- Visualize a linha central e limites da pista
-
-### 2. **Configurar Veículo** ⚙️
-- Página "Parameters" permite ajustar:
-  - **Massa/Geometria**: Massa, distância CG, altura CG
-  - **Pneus**: Cornering stiffness (Cf, Cr), coeficiente de atrito (μ)
-  - **Motor**: Potência, torque, RPM máxima
-  - **Transmissão**: Número de marchas, relações, final drive
-  - **Freios**: Desaceleração máxima
-  - **Aerodinâmica**: Cd, área frontal, Cl (downforce)
-
-### 3. **Simular** ▶️
-- Configure condições:
-  - Tipo de simulação (Qualificatória, Treino Livre, etc.)
-  - Coeficiente de aderência (μ track)
-  - Consumo de combustível (L/100km)
-  - Temperatura inicial dos pneus (°C)
-- Clique em "▶ Play (Simulate)"
-
-### 4. **Analisar Resultados** 📊
-- **KPIs**: Lap time, V_max, V_avg, acelerações máximas
-- **Telemetria**: Tabela completa com distância, velocidade, aceleração, marchas
-- **Gráficos Interativos**:
-  - Velocidade vs Distância
-  - Aceleração Lateral vs Distância
-  - Marcha & RPM vs Distância
-  - Temperatura dos Pneus vs Distância
-- **Export**: Download CSV completo da telemetria
-
-## 📂 Estrutura do Projeto
-
-```
-LapTimeSimulator_CopaTruck/
-├── src/
-│   ├── simulation/          # Motor de simulação (lap_time_solver.py)
-│   ├── vehicle/             # Parâmetros e modelos de veículo
-│   ├── tracks/              # Gerenciamento de circuitos (HDF5, TUM FTM)
-│   ├── visualization/       # Interface Streamlit
-│   ├── optimization/        # Otimização de setup (futuro)
-│   └── results/             # Resultados exportados (.csv)
-├── tracks/                  # Arquivos de circuitos (.hdf5)
-├── data/                    # Modelos de veículos (.json)
-├── requirements.txt         # Dependências Python
-└── README.md
-```
-
-## 🔧 Arquitetura Técnica
-
-### Modelo de Simulação
-
-**Bicycle Model 2DOF** com extensões:
-- Dinâmica lateral: Forças de curva (Cf, Cr)
-- Dinâmica longitudinal: Tração limitada por aderência + arrasto aerodinâmico
-- Motor: Curva de torque realista (pico em ~1300 RPM para diesel)
-- Transmissão: Seleção automática de marcha para manter RPM ótima (1200-2200 RPM)
-- Freios: Círculo de aderência (desaceleração máxima respeitando a_lat)
-
-### Forward-Backward Pass
-1. **Forward**: Acelera máximo respeitando limite de tração e velocidade lateral
-2. **Backward**: Freia para não exceder velocidade limite nas curvas
-
-### Parâmetros Veículo (`VehicleParams`)
-
-Estrutura modular com dataclasses:
-- `VehicleMassGeometry`: Massa, wheelbase, CG, inércias
-- `TireParams`: Cf, Cr, μ, raio da roda
-- `AeroParams`: Cd, área frontal, Cl
-- `EngineParams`: Potência, torque, RPM
-- `TransmissionParams`: Marchas, relações, final drive
-- `BrakeParams`: Força máxima, balanceamento, desaceleração
-
-**Preset Padrão**: `copa_truck_2dof_default()` - Mercedes-Benz Actros 600 kW
-
-### Circuitos
-
-Formato **HDF5** comprimido com:
-- Linha central (centerline_x, centerline_y)
-- Limites esquerdo/direito
-- Largura da pista
-- Metadados (nome, comprimento, sistema de coordenadas)
-
-**Fontes**:
-- TUM FTM Database: `src/tracks/tumftm.py`
-- OpenStreetMap: `src/tracks/osm.py` (futuro)
-- Geradores personalizados: `src/tracks/generator.py`
-
-## 📊 Exemplo de Saída
-
-```
-✓ Lap time: 84.73s
-✓ V_max: 187.3 km/h | V_avg: 142.8 km/h
-✓ a_lat_max: 8.45 m/s² | a_long_max: 4.21 m/s²
-✓ Consumo total: 2.35L | Temp pneu máx: 89.2°C
-```
-
-## 🛠️ Desenvolvimento
-
-### Adicionar Novo Circuito
-
-```python
-from src.tracks.hdf5 import CircuitHDF5Writer, CircuitData
-import numpy as np
-
-# Defina coordenadas (x, y) da linha central
-centerline_x = np.array([...])
-centerline_y = np.array([...])
-
-# Calcule limites e largura
-# ...
-
-circuit = CircuitData(
-    name="Meu Circuito",
-    centerline_x=centerline_x,
-    centerline_y=centerline_y,
-    left_boundary_x=left_x,
-    left_boundary_y=left_y,
-    right_boundary_x=right_x,
-    right_boundary_y=right_y,
-    track_width=track_width
-)
-
-writer = CircuitHDF5Writer("tracks/meu_circuito.hdf5")
-writer.write_circuit(circuit)
-```
-
-### Criar Modelo de Veículo Personalizado
-
-```python
-from src.vehicle.parameters import VehicleParams, VehicleMassGeometry, TireParams, ...
-
-meu_caminhao = VehicleParams(
-    mass_geometry=VehicleMassGeometry(mass=5500.0, lf=2.2, lr=2.4, ...),
-    tire=TireParams(cornering_stiffness_front=130000.0, ...),
-    # ... outros parâmetros
-    name="Meu Caminhão Custom",
-    manufacturer="Volvo",
-    year=2025
-)
-
-# Salvar
-meu_caminhao.save_to_json("data/meu_caminhao.json")
-```
-
-## 🎯 Roadmap
-
-- [ ] Modelo 3DOF com roll dynamics
-- [ ] Otimização de setup com algoritmos genéticos
-- [ ] Modelo térmico de pneus (Pacejka Magic Formula)
-- [ ] Estratégia de combustível e pit stop
-- [ ] Comparação multi-volta
-- [ ] Export para simuladores (ACC, rFactor2)
-- [ ] API REST para integração com telemetria real
-
-## 📚 Referências
-
-- **Rajamani, R.** (2012) - Vehicle Dynamics and Control
-- **Pacejka, H.** (2012) - Tire and Vehicle Dynamics
-- **Gillespie, T.** (1992) - Fundamentals of Vehicle Dynamics
-- **TUM FTM** - Racetrack Database: https://github.com/TUMFTM/racetrack-database
-
-## 👨‍💻 Autor
-
-**Vitor Mattos**  
-GitHub: [@vitormtt](https://github.com/vitormtt)
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+## 📚 Referências Acadêmicas Base
+- **Casanova, D. (2000)** - *On minimum time vehicle manoeuvring: The theoretical optimal lap.* (Fundamentação algorítmica para a solução QSS Forward-Backward).
+- **Gillespie, T.D. (1992)** - *Fundamentals of Vehicle Dynamics.* (Equações de movimento, taxas de Yaw e transferência de carga elástica).
+- **Pacejka, H.B. (2012)** - *Tire and Vehicle Dynamics.* (Friction Circle e "Magic Formula" simplificada para estresse de banda de rodagem).
+- **Savaresi, S. M. et al. (2010)** - *Automotive Semi-Active Suspensions.* (Embasamento da simplificação em 2-DOF macroscópica para o tempo de volta contínuo).
 
 ---
-
-⭐ Se este projeto foi útil, considere dar uma estrela no GitHub!
+*Desenvolvido seguindo as diretrizes PEP 8 (Python) aplicadas à Engenharia Automotiva.*
