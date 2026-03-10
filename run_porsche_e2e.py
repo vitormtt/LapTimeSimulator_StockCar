@@ -47,50 +47,38 @@ def build_interlagos_circuit(n_points: int = 2000) -> CircuitData:
     """
     Build a parametric approximation of Interlagos for solver testing.
 
-    The circuit is constructed from a sequence of straights and circular arcs
-    that approximate the key sections: Reta Oposta, S do Senna, Curva 3,
-    Descida do Lago, Ferradura, Junco, Mergulho, and Reta Principal.
+    Segments approximate: S do Senna, Reta Oposta, Descida do Lago,
+    Ferradura, Subida dos Boxes, Junco, Mergulho, Reta Principal.
 
     Args:
         n_points: Number of centerline points.
 
     Returns:
-        CircuitData with centerline_x, centerline_y and placeholder boundaries.
+        CircuitData with centerline and placeholder boundaries.
     """
-    # --- Define segments: (type, length_m OR radius_m, angle_deg) ---
-    # type: 'straight' -> (length,)  |  'arc' -> (radius, sweep_deg)
     segments = [
-        # S do Senna approach
         ("straight", 200),
-        ("arc",      55,  -80),   # Curva 1 — left (Senna S)
-        ("arc",      45,   70),   # Curva 2 — right
-        # Reta Oposta
+        ("arc",      55,  -80),
+        ("arc",      45,   70),
         ("straight", 570),
-        # Curva 3 / Descida do Lago
         ("arc",      80,  -60),
         ("straight", 150),
         ("arc",      50,   45),
-        # Ferradura
         ("straight", 200),
-        ("arc",      30, -180),   # Ferradura (hairpin)
-        # Subida dos Boxes
+        ("arc",      30, -180),
         ("straight", 380),
         ("arc",      45,  -50),
-        # Junco
         ("straight", 150),
         ("arc",      35,   80),
         ("straight", 120),
-        # Mergulho
         ("arc",      60,  -90),
         ("straight", 200),
-        # Reta Principal
         ("straight", 750),
-        ("arc",      90,  -45),   # Curva 1 approach (close loop)
+        ("arc",      90,  -45),
     ]
 
-    # Integrate segments into (x, y, heading) trajectory
     x_pts, y_pts = [0.0], [0.0]
-    heading = 0.0  # [degrees] initial heading (pointing along +x)
+    heading = 0.0
 
     for seg in segments:
         if seg[0] == "straight":
@@ -102,9 +90,8 @@ def build_interlagos_circuit(n_points: int = 2000) -> CircuitData:
             ys = np.linspace(y_pts[-1], y_pts[-1] + dy, n_seg + 1)[1:]
             x_pts.extend(xs.tolist())
             y_pts.extend(ys.tolist())
-
         elif seg[0] == "arc":
-            radius, sweep = seg[1], seg[2]  # sweep in degrees
+            radius, sweep = seg[1], seg[2]
             n_seg = max(4, int(abs(sweep) / 3))
             cx = x_pts[-1] - radius * np.sin(np.radians(heading))
             cy = y_pts[-1] + radius * np.cos(np.radians(heading))
@@ -118,20 +105,20 @@ def build_interlagos_circuit(n_points: int = 2000) -> CircuitData:
     x_raw = np.array(x_pts)
     y_raw = np.array(y_pts)
 
-    # Interpolate to n_points
     from scipy.interpolate import interp1d
-    s_raw = np.concatenate(([0], np.cumsum(np.sqrt(np.diff(x_raw)**2 + np.diff(y_raw)**2))))
+    s_raw = np.concatenate(([0], np.cumsum(
+        np.sqrt(np.diff(x_raw) ** 2 + np.diff(y_raw) ** 2)
+    )))
     s_new = np.linspace(0, s_raw[-1], n_points)
     x = interp1d(s_raw, x_raw, kind='linear')(s_new)
     y = interp1d(s_raw, y_raw, kind='linear')(s_new)
 
-    # Simple normal-offset boundaries (constant 10 m half-width)
     dx = np.gradient(x)
     dy = np.gradient(y)
-    norm = np.sqrt(dx**2 + dy**2) + 1e-9
+    norm = np.sqrt(dx ** 2 + dy ** 2) + 1e-9
     nx = -dy / norm
     ny =  dx / norm
-    half_w = 5.5  # [m] half track width
+    half_w = 5.5
 
     circuit = CircuitData(
         name="Interlagos (parametric approx.)",
@@ -144,28 +131,35 @@ def build_interlagos_circuit(n_points: int = 2000) -> CircuitData:
         track_width=np.full(n_points, half_w * 2),
         coordinate_system="local_ENU",
     )
-    circuit_length = s_raw[-1]
     print(f"  Circuit: {circuit.name}")
-    print(f"  Length : {circuit_length:.0f} m  ({n_points} points)")
+    print(f"  Length : {s_raw[-1]:.0f} m  ({n_points} points)")
     return circuit
 
 
 # ---------------------------------------------------------------------------
-# SIMULATION CONFIG
+# SETUPS
 # ---------------------------------------------------------------------------
 SETUPS = {
-    "default":       VehicleSetup(arb_front=4, arb_rear=4, wing_position=5,
-                                  tyre_pressure=1.8, brake_bias=-1.0,
-                                  setup_name="default"),
-    "high_downforce": VehicleSetup(arb_front=5, arb_rear=3, wing_position=9,
-                                   tyre_pressure=1.85, brake_bias=-0.5,
-                                   setup_name="high_downforce"),
+    "default": VehicleSetup(
+        arb_front=4, arb_rear=4, wing_position=5,
+        tyre_pressure=1.8, brake_bias=-1.0,
+        setup_name="default",
+    ),
+    "high_downforce": VehicleSetup(
+        arb_front=5, arb_rear=3, wing_position=9,
+        tyre_pressure=1.85, brake_bias=-0.5,
+        setup_name="high_downforce",
+    ),
 }
 
 VEHICLE_IDS = ["porsche_991_1", "porsche_991_2", "porsche_992_1"]
 
+# GT3 Cup: gear_min=1 (full 6-gear range, no clamp)
+# Copa Truck callers: use gear_min=4
 SOLVER_CONFIG = {
-    "coef_aderencia": 1.55,   # mu override for circuit conditions (slick)
+    "gear_min": 1,
+    # coef_aderencia intentionally omitted — mu comes from each vehicle's
+    # TireParams.friction_coefficient via to_solver_dict()["mu"]
 }
 
 
@@ -173,14 +167,16 @@ SOLVER_CONFIG = {
 # MAIN
 # ---------------------------------------------------------------------------
 def main() -> None:
-    print("\n=" * 60)
+    print("\n" + "=" * 60)
     print("  Porsche GT3 Cup — E2E Lap Time Simulation")
     print("=" * 60)
 
     circuit = build_interlagos_circuit(n_points=2000)
 
-    # Header
-    header = f"{'Vehicle':<35} {'Setup':<15} {'LapTime':>9} {'Vmax':>8} {'Vmean':>8} {'T_tyre':>8} {'Fuel_L':>8}"
+    header = (
+        f"{'Vehicle':<35} {'Setup':<15} {'LapTime':>9}"
+        f" {'Vmax':>8} {'Vmean':>8} {'T_tyre':>8} {'Fuel_L':>8}"
+    )
     print(f"\n{header}")
     print("-" * len(header))
 
@@ -192,13 +188,11 @@ def main() -> None:
         for setup_name, setup in SETUPS.items():
             params = apply_setup(base_params, setup)
             solver_dict = params.to_solver_dict()
-
-            # k_roll from actual setup ARB stiffness (combined front+rear)
             solver_dict["k_roll"] = setup.arb_front_stiffness + setup.arb_rear_stiffness
 
             csv_path = OUT_DIR / f"{vid}_{setup_name}.csv"
-
             t0 = time.perf_counter()
+
             try:
                 result = run_bicycle_model(
                     params_dict=solver_dict,
@@ -209,17 +203,22 @@ def main() -> None:
                 )
                 elapsed = time.perf_counter() - t0
 
-                lap_s   = result["lap_time"]
-                v_kmh   = result["v_profile"] * 3.6
-                vmax    = float(np.max(v_kmh))
-                vmean   = float(np.mean(v_kmh))
-                t_tyre  = float(result["temp_pneu"][-1])
-                fuel    = float(result["consumo"][-1])
+                lap_s  = result["lap_time"]
+                v_kmh  = result["v_profile"] * 3.6
+                vmax   = float(np.max(v_kmh))
+                vmean  = float(np.mean(v_kmh))
+                t_tyre = float(result["temp_pneu"][-1])
+                fuel   = float(result["consumo"][-1])
 
                 lap_str = f"{int(lap_s // 60)}:{lap_s % 60:06.3f}"
-                print(f"{params.name:<35} {setup_name:<15} {lap_str:>9} "
-                      f"{vmax:>7.1f}k {vmean:>7.1f}k {t_tyre:>7.1f}C {fuel:>8.3f}L")
-                print(f"  {'':35} {'':15} compute: {elapsed:.3f}s  -> {csv_path.name}")
+                print(
+                    f"{params.name:<35} {setup_name:<15} {lap_str:>9}"
+                    f" {vmax:>7.1f}k {vmean:>7.1f}k {t_tyre:>7.1f}C {fuel:>8.3f}L"
+                )
+                print(
+                    f"  {'':35} {'':15}"
+                    f" compute: {elapsed:.3f}s  -> {csv_path.name}"
+                )
 
                 results_all.append({
                     "vehicle": vid, "setup": setup_name,
@@ -231,7 +230,10 @@ def main() -> None:
             except Exception as exc:
                 import traceback
                 elapsed = time.perf_counter() - t0
-                print(f"{params.name:<35} {setup_name:<15} [FAIL] {type(exc).__name__}: {exc}")
+                print(
+                    f"{params.name:<35} {setup_name:<15}"
+                    f" [FAIL] {type(exc).__name__}: {exc}"
+                )
                 traceback.print_exc()
 
     print("\n" + "=" * 60)
