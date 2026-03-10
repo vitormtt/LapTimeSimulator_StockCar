@@ -41,7 +41,7 @@ class VehicleMassGeometry:
     lf: float                # Distance from CG to front axle [m]
     lr: float                # Distance from CG to rear axle [m]
     wheelbase: float         # Total wheelbase = lf + lr [m]
-    track_width_front: float # Front track width [m]
+    track_width_front: float  # Front track width [m]
     track_width_rear: float  # Rear track width [m]
     cg_height: float         # CG height above ground [m]
     Iz: float                # Yaw moment of inertia [kg·m²]
@@ -84,6 +84,9 @@ class TireParams:
     pacejka_C: float = 1.3    # Shape factor [-]
     pacejka_D: float = 1.0    # Peak factor [-]
     pacejka_E: float = 0.97   # Curvature factor [-]
+
+    # Cold tyre pressure (passed to ThermalPacejkaTire)
+    cold_pressure_bar: float = 1.8  # Cold tyre pressure [bar] (GT3 default)
 
     # Thermal model (future tire temperature simulation)
     thermal_capacity: float = 0.0      # Tire thermal capacity [J/K]
@@ -177,6 +180,11 @@ class VehicleParams:
     transmission: TransmissionParams
     brake: BrakeParams
 
+    # Roll stiffness (ARB) [Nm/rad]
+    k_roll: float = 230_000.0
+    k_roll_front: float = 115_000.0   # Front ARB stiffness
+    k_roll_rear: float = 115_000.0    # Rear ARB stiffness
+
     # Metadata
     name: str = "Unnamed Vehicle"
     manufacturer: str = ""
@@ -202,6 +210,9 @@ class VehicleParams:
             engine=EngineParams(**data['engine']),
             transmission=TransmissionParams(**data['transmission']),
             brake=BrakeParams(**data['brake']),
+            k_roll=data.get('k_roll', 230_000.0),
+            k_roll_front=data.get('k_roll_front', 115_000.0),
+            k_roll_rear=data.get('k_roll_rear', 115_000.0),
             name=data.get('name', 'Unnamed Vehicle'),
             manufacturer=data.get('manufacturer', ''),
             year=data.get('year', 0),
@@ -239,9 +250,10 @@ class VehicleParams:
             'track_width_front': mg.track_width_front,
             'track_width_rear': mg.track_width_rear,
 
-            # --- Roll stiffness (ARB) — combined front+rear estimate ---
-            # Updated by apply_setup() when a VehicleSetup is applied.
-            'k_roll': 230_000.0,  # [Nm/rad] default mid-range ARB (pos 4/7)
+            # --- Roll stiffness (ARB) — front/rear split ---
+            'k_roll': self.k_roll,
+            'k_roll_front': self.k_roll_front,
+            'k_roll_rear': self.k_roll_rear,
 
             # --- Tires ---
             'Cf': self.tire.cornering_stiffness_front,
@@ -253,6 +265,7 @@ class VehicleParams:
             'pacejka_C': self.tire.pacejka_C,
             'pacejka_D': self.tire.pacejka_D,
             'pacejka_E': self.tire.pacejka_E,
+            'P_cold_bar': self.tire.cold_pressure_bar,
 
             # --- Engine ---
             'P_max': self.engine.max_power,
@@ -279,6 +292,10 @@ class VehicleParams:
             'Cx': self.aero.drag_coefficient,
             'A_front': self.aero.frontal_area,
             'Cl': self.aero.lift_coefficient,
+
+            # --- Fuel model ---
+            'bsfc': 265.0 if self.category == 'GT3_Cup' else 210.0,  # g/kWh
+            'fuel_density': 0.74 if self.category == 'GT3_Cup' else 0.85,  # kg/L
         }
 
     @classmethod
@@ -334,7 +351,7 @@ class VehicleParams:
             transmission=TransmissionParams(
                 num_gears=data.get('n_gears', 12),
                 gear_ratios=data.get('gear_ratios', [14.0, 10.5, 7.8, 5.9, 4.5, 3.5,
-                                                      2.7, 2.1, 1.6, 1.25, 1.0, 0.78]),
+                                                     2.7, 2.1, 1.6, 1.25, 1.0, 0.78]),
                 final_drive_ratio=data.get('final_drive', 5.33),
                 shift_time=data.get('shift_time', 0.3),
                 upshift_rpm=data.get('upshift_rpm', 0.0),
@@ -436,9 +453,11 @@ def validate_vehicle_params(params: VehicleParams) -> List[str]:
     if mg.lf <= 0 or mg.lr <= 0:
         errors.append("lf and lr must be positive")
     if abs(mg.wheelbase - (mg.lf + mg.lr)) > 0.01:
-        errors.append(f"wheelbase ({mg.wheelbase}) must equal lf + lr ({mg.lf + mg.lr:.3f})")
+        errors.append(
+            f"wheelbase ({mg.wheelbase}) must equal lf + lr ({mg.lf + mg.lr:.3f})")
     if mg.track_width_front <= 0 or mg.track_width_rear <= 0:
-        errors.append("track_width_front and track_width_rear must be positive")
+        errors.append(
+            "track_width_front and track_width_rear must be positive")
 
     if params.tire.cornering_stiffness_front <= 0 or params.tire.cornering_stiffness_rear <= 0:
         errors.append("Cornering stiffness must be positive")

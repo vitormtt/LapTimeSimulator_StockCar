@@ -60,6 +60,8 @@ def build_modular_truck_from_dict(params_dict: dict) -> BicycleVehicle2DOF:
         'rpm_max':        params_dict.get('rpm_max', 2800),
         'idle_rpm':       params_dict.get('rpm_idle', 800),
         'redline_rpm':    params_dict.get('rpm_max', 2800),
+        'bsfc':           params_dict.get('bsfc', 210),
+        'fuel_density':   params_dict.get('fuel_density', 0.85),
     }
     if 'torque_curve_rpm' in params_dict and 'torque_curve_nm' in params_dict:
         engine_config['torque_curve_rpm'] = params_dict['torque_curve_rpm']
@@ -84,6 +86,8 @@ def build_modular_truck_from_dict(params_dict: dict) -> BicycleVehicle2DOF:
             [14.0, 10.5, 7.8, 5.9, 4.5, 3.5, 2.7, 2.1, 1.6, 1.25, 1.0, 0.78]
         ),
         'final_drive': params_dict.get('final_drive', 5.33),
+        'upshift_rpm': params_dict.get('upshift_rpm', 2500),
+        'downshift_rpm': params_dict.get('downshift_rpm', 1200),
     })
 
     tires = ThermalPacejkaTire({
@@ -112,6 +116,8 @@ def build_modular_truck_from_dict(params_dict: dict) -> BicycleVehicle2DOF:
         tire_sys=tires,
         track_width=params_dict.get('track_width', 2.45),
         k_roll=params_dict.get('k_roll', 415000.0),
+        k_roll_front=params_dict.get('k_roll_front', None),
+        k_roll_rear=params_dict.get('k_roll_rear', None),
     )
 
 
@@ -131,6 +137,9 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     rho = 1.225
     mu_aderencia = config.get("coef_aderencia", truck.tires.mu_y)
     gear_min: int = int(config.get("gear_min", params_dict.get("gear_min", 1)))
+
+    # Acceleration/deceleration cap: GT3 ~15 m/s², Truck ~8 m/s²
+    a_cap = 15.0 if gear_min == 1 else 8.0
 
     Cx = params_dict.get('Cx', 0.85)
     A_front = params_dict.get('A_front', 8.7)
@@ -181,16 +190,46 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
     lr = truck.wheelbase - lf
     L = truck.wheelbase
     h = truck.cg_height
+    tw = truck.track_width
 
-    # P2: vectorised v_lat_max (replaces Python for-loop, ~10x faster on long circuits)
-    # v_lat = sqrt(mu * m * g / (m/R - 0.5*rho*|Cl|*A*mu))
-    # Cl is negative for downforce; -0.5*rho*Cl*A*mu > 0 increases available grip
+    # --- Load-sensitivity model ---
+    # ARBs redistribute the total lateral load transfer between front and rear.
+    # The axle receiving more load transfer loses more grip (load sensitivity).
+    # Total ΔFz_lat is fixed by physics: m * a_lat * h / tw
+    # Front share: k_roll_front / k_roll_total
+    # Rear share:  k_roll_rear  / k_roll_total
+    # The critical (most loaded) axle limits cornering speed.
+    k_ls = 0.20   # load-sensitivity coefficient (0 = no effect, 0.25 = strong)
+    k_roll_total = truck.k_roll_front + truck.k_roll_rear
+    # Fraction of total load transfer borne by each axle (via ARB stiffness ratio)
+    arb_frac_front = truck.k_roll_front / max(k_roll_total, 1.0)
+    arb_frac_rear = truck.k_roll_rear / max(k_roll_total, 1.0)
+    # The critical axle is the one with the highest fraction → loses more grip
+    arb_frac_max = max(arb_frac_front, arb_frac_rear)
+    Fz_static = truck.mass * g / 2.0  # per-axle static load
+
+    # P2: vectorised v_lat_max with load-transfer correction
+    # First pass: no correction (baseline)
     denom_vec = (truck.mass / radius) - \
         (0.5 * rho * Cl * A_front * mu_aderencia)
     v_lat_max_profile = np.where(
         denom_vec > 0,
         np.sqrt(np.maximum(0.0, (mu_aderencia * truck.mass * g) /
                 np.maximum(denom_vec, 1e-9))),
+        250.0 / 3.6,
+    )
+    # Second pass: apply load-sensitivity correction using first-pass v
+    a_lat_est = v_lat_max_profile**2 / radius
+    # ΔFz on the critical axle as fraction of static per-axle load
+    delta_fz_frac = np.clip(
+        truck.mass * a_lat_est * h * arb_frac_max / (tw * Fz_static), 0.0, 0.95
+    )
+    mu_eff = mu_aderencia * (1.0 - k_ls * delta_fz_frac)
+    denom_vec2 = (truck.mass / radius) - (0.5 * rho * Cl * A_front * mu_eff)
+    v_lat_max_profile = np.where(
+        denom_vec2 > 0,
+        np.sqrt(np.maximum(0.0, (mu_eff * truck.mass * g) /
+                np.maximum(denom_vec2, 1e-9))),
         250.0 / 3.6,
     )
 
@@ -232,8 +271,12 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         Fz_rear_static = truck.mass * g * (lf / L)
         Fz_rear_dynamic = Fz_rear_static + truck.mass * \
             a_prev * (h / L) + F_downforce * 0.5
-        max_rear_grip = mu_aderencia * Fz_rear_dynamic
         F_lateral = truck.mass * (v_prev ** 2 / radius[i])
+        # Load-sensitivity correction for forward pass (ARB-dependent)
+        dfz_frac_fwd = min(abs(F_lateral) * h *
+                           arb_frac_max / (tw * Fz_static * g), 0.95)
+        mu_eff_fwd = mu_aderencia * (1.0 - k_ls * dfz_frac_fwd)
+        max_rear_grip = mu_eff_fwd * Fz_rear_dynamic
 
         available_long_grip = (
             np.sqrt(max(0.0, max_rear_grip ** 2 - (F_lateral * 0.5) ** 2))
@@ -241,7 +284,7 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
         )
 
         a = (min(F_traction_engine, available_long_grip) - F_drag) / truck.mass
-        a = min(a, 8.0)
+        a = min(a, a_cap)
         a_long[i - 1] = a
 
         if ds[i] > 0:
@@ -267,6 +310,11 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
                           Delta_Fz_brake + F_downforce_next * 0.5)
 
         max_total_grip = mu_aderencia * (Fz_front_dyn + Fz_rear_dyn)
+        # Load-sensitivity correction for backward pass (ARB-dependent)
+        dfz_frac_bwd = min(abs(F_lateral_next) * h * arb_frac_max /
+                           (tw * Fz_static * g), 0.95)
+        mu_eff_bwd = mu_aderencia * (1.0 - k_ls * dfz_frac_bwd)
+        max_total_grip = mu_eff_bwd * (Fz_front_dyn + Fz_rear_dyn)
         available_brake_grip = (
             np.sqrt(max(0.0, max_total_grip ** 2 - F_lateral_next ** 2))
             if max_total_grip > F_lateral_next else 0.0
@@ -278,7 +326,7 @@ def run_bicycle_model(params_dict, circuit, config, save_csv=True, out_path=None
                 v_next, Fz_front_dyn, Fz_rear_dyn)
         )
         a_drag_next = (0.5 * rho * Cx * A_front * v_next ** 2) / truck.mass
-        a_decel_effective = min(a_decel_brakes + a_drag_next, 8.0)
+        a_decel_effective = min(a_decel_brakes + a_drag_next, a_cap)
 
         if ds[i + 1] > 0:
             v_profile[i] = min(

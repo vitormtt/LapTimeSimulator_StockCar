@@ -124,7 +124,7 @@ class ICEEngine(BasePowertrain):
 
     def get_fuel_consumption(self, power_kw: float, dt: float) -> float:
         bsfc = self.config.get('bsfc', 210)   # g/kWh
-        fuel_density = 0.85                    # kg/L (diesel)
+        fuel_density = self.config.get('fuel_density', 0.85)  # kg/L
         fuel_rate_kg = (bsfc * power_kw) / (3600 * 1000)
         fuel_rate_L = fuel_rate_kg / fuel_density
         return fuel_rate_L * dt

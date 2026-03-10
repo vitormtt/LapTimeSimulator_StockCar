@@ -71,7 +71,7 @@ _WING_DELTA: Tuple[Tuple[float, float], ...] = (
     (-0.030, +0.22),  # pos 2
     (-0.015, +0.12),  # pos 3
     (-0.005, +0.04),  # pos 4
-    ( 0.000,  0.00),  # pos 5 — baseline (default)
+    (0.000,  0.00),  # pos 5 — baseline (default)
     (+0.010, -0.08),  # pos 6
     (+0.025, -0.18),  # pos 7
     (+0.045, -0.30),  # pos 8
@@ -84,8 +84,10 @@ _WING_DELTA: Tuple[Tuple[float, float], ...] = (
 _TYRE_PRESSURE_REFERENCE: float = 1.8     # [bar] cold reference
 _TYRE_PRESSURE_MIN: float = 1.4           # [bar] minimum safe
 _TYRE_PRESSURE_MAX: float = 2.4           # [bar] maximum safe
-_CS_CHANGE_PER_BAR: float = 0.15          # [fraction] Δcornering_stiffness / bar
-_MU_CHANGE_PER_BAR: float = -0.03         # [fraction] Δmu / bar (over-pressure reduces grip)
+# [fraction] Δcornering_stiffness / bar
+_CS_CHANGE_PER_BAR: float = 0.15
+# [fraction] Δmu / bar (over-pressure reduces grip)
+_MU_CHANGE_PER_BAR: float = -0.03
 
 
 @dataclass
@@ -118,14 +120,16 @@ class VehicleSetup:
         if not 1 <= self.arb_rear <= 7:
             raise ValueError(f"arb_rear must be 1–7, got {self.arb_rear}")
         if not 1 <= self.wing_position <= 9:
-            raise ValueError(f"wing_position must be 1–9, got {self.wing_position}")
+            raise ValueError(
+                f"wing_position must be 1–9, got {self.wing_position}")
         if not _TYRE_PRESSURE_MIN <= self.tyre_pressure <= _TYRE_PRESSURE_MAX:
             raise ValueError(
                 f"tyre_pressure must be {_TYRE_PRESSURE_MIN}–{_TYRE_PRESSURE_MAX} bar, "
                 f"got {self.tyre_pressure}"
             )
         if not -2.0 <= self.brake_bias <= 0.0:
-            raise ValueError(f"brake_bias must be -2.0 to 0, got {self.brake_bias}")
+            raise ValueError(
+                f"brake_bias must be -2.0 to 0, got {self.brake_bias}")
 
     @property
     def arb_front_stiffness(self) -> float:
@@ -215,6 +219,7 @@ def apply_setup(base_params: VehicleParams, setup: VehicleSetup) -> VehicleParam
         cornering_stiffness_front=base_params.tire.cornering_stiffness_front * cs_scale,
         cornering_stiffness_rear=base_params.tire.cornering_stiffness_rear * cs_scale,
         friction_coefficient=base_params.tire.friction_coefficient * mu_scale,
+        cold_pressure_bar=setup.tyre_pressure,
     )
 
     # --- Aerodynamic effect of wing position ---
@@ -234,11 +239,19 @@ def apply_setup(base_params: VehicleParams, setup: VehicleSetup) -> VehicleParam
         ),
     )
 
+    # --- ARB stiffness → k_roll front/rear ---
+    k_roll_f = setup.arb_front_stiffness
+    k_roll_r = setup.arb_rear_stiffness
+    k_roll_combined = k_roll_f + k_roll_r
+
     return replace(
         base_params,
         tire=new_tire,
         aero=new_aero,
         brake=new_brake,
+        k_roll=k_roll_combined,
+        k_roll_front=k_roll_f,
+        k_roll_rear=k_roll_r,
     )
 
 

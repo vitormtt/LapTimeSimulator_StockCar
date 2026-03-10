@@ -12,13 +12,17 @@ Run from project root:
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from itertools import product
 import logging
 import time
 import os
 import sys
+import hashlib
+import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -66,6 +70,58 @@ os.makedirs(RESULTS_PATH, exist_ok=True)
 
 def fmt_laptime(s: float) -> str:
     return f"{int(s // 60)}:{s % 60:06.3f}"
+
+
+def _solver_cache_key(params_dict: dict, circuit, config: dict) -> str:
+    """Build a deterministic hash from solver inputs for caching."""
+    parts: list[str] = []
+    for k in sorted(params_dict.keys()):
+        v = params_dict[k]
+        if isinstance(v, np.ndarray):
+            parts.append(f"{k}={v.tobytes().hex()[:32]}")
+        elif isinstance(v, (list, tuple)):
+            parts.append(f"{k}={str(v)}")
+        else:
+            parts.append(f"{k}={v}")
+    parts.append(f"cfg={json.dumps(config, sort_keys=True)}")
+    parts.append(f"cx={circuit.centerline_x.tobytes().hex()[:32]}")
+    parts.append(f"cy={circuit.centerline_y.tobytes().hex()[:32]}")
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+_solver_result_cache: dict[str, dict] = {}
+
+
+def _cached_solver(params_dict, circuit, config, save_csv=False, out_path=None):
+    """Run solver with in-memory cache (skip re-computation for same inputs)."""
+    key = _solver_cache_key(params_dict, circuit, config)
+    if key in _solver_result_cache:
+        result = _solver_result_cache[key]
+        # Still save CSV if requested but result was cached
+        if save_csv and out_path:
+            _save_result_csv(result, out_path)
+        return result
+    result = run_bicycle_model(
+        params_dict=params_dict, circuit=circuit, config=config,
+        save_csv=save_csv, out_path=out_path,
+    )
+    _solver_result_cache[key] = result
+    return result
+
+
+def _save_result_csv(result: dict, path: str):
+    """Write a cached result to CSV (same columns as solver)."""
+    df = pd.DataFrame({
+        "Distance": result["distance"],
+        "Time": result["time"],
+        "Speed": result["v_profile"] * 3.6,
+        "G_Long": result["a_long"] / 9.81,
+        "G_Lat": result["a_lat"] / 9.81,
+        "Gear": result["gear"],
+        "Engine_RPM": result["rpm"],
+    })
+    df.to_csv(path, index=False)
 
 
 @st.cache_data
@@ -327,15 +383,6 @@ def simulacao_page():
                     # Copa Truck legacy VehicleParams
                     params_dict = vp.to_solver_dict()
 
-                # ARB k_roll from setup if GT3
-                setup = st.session_state.get("setup")
-                if setup is not None:
-                    params_dict["k_roll"] = (
-                        setup.arb_front_stiffness + setup.arb_rear_stiffness
-                    )
-                else:
-                    params_dict.setdefault("k_roll", 450000.0)
-
                 params_dict.setdefault("track_width", 2.45)
 
                 # Solver config
@@ -352,7 +399,7 @@ def simulacao_page():
 
                 t0 = time.perf_counter()
                 try:
-                    result = run_bicycle_model(
+                    result = _cached_solver(
                         params_dict=params_dict,
                         circuit=st.session_state.circuit,
                         config=solver_config,
@@ -607,6 +654,223 @@ def resultados_page():
             margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig_steer, width='stretch')
 
+    # --- Porsche Data Analysis Sections (ENG170914 / ENG210319) ---
+
+    # ── Sector Timing ────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🏁 Sector Timing")
+    track_len = float(dist[-1])
+    n_sectors = st.slider("Number of sectors", 3, 12, 3, key="n_sectors")
+    sector_boundaries = np.linspace(0, track_len, n_sectors + 1)
+    sector_rows = []
+    for s_idx in range(n_sectors):
+        s_start, s_end = sector_boundaries[s_idx], sector_boundaries[s_idx + 1]
+        mask = (dist >= s_start) & (dist < s_end)
+        if not np.any(mask):
+            continue
+        idxs = np.where(mask)[0]
+        t_sector = res['time'][idxs[-1]] - res['time'][idxs[0]]
+        v_avg_s = float(np.mean(v_kmh[mask]))
+        v_min_s = float(np.min(v_kmh[mask]))
+        v_max_s = float(np.max(v_kmh[mask]))
+        sector_rows.append({
+            "Sector": f"S{s_idx+1}",
+            "From (m)": f"{s_start:.0f}",
+            "To (m)": f"{s_end:.0f}",
+            "Time": fmt_laptime(t_sector),
+            "Time (s)": f"{t_sector:.3f}",
+            "V avg (km/h)": f"{v_avg_s:.1f}",
+            "V min (km/h)": f"{v_min_s:.1f}",
+            "V max (km/h)": f"{v_max_s:.1f}",
+        })
+    if sector_rows:
+        st.dataframe(pd.DataFrame(sector_rows), width='stretch')
+
+    # ── Braking Zone Analysis ────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🛑 Braking Zone Analysis")
+    brake_threshold = -0.15  # G threshold to detect braking
+    in_brake = False
+    brake_zones = []
+    bz_start = 0
+    for i in range(len(alon_g)):
+        if alon_g[i] < brake_threshold and not in_brake:
+            in_brake = True
+            bz_start = i
+        elif (alon_g[i] >= brake_threshold or i == len(alon_g) - 1) and in_brake:
+            in_brake = False
+            bz_end = i
+            if bz_end - bz_start > 5:  # filter out noise
+                d_brake = dist[bz_end] - dist[bz_start]
+                v_entry = float(v_kmh[bz_start])
+                v_exit = float(v_kmh[bz_end])
+                peak_decel = float(np.min(alon_g[bz_start:bz_end+1]))
+                t_brake = res['time'][bz_end] - res['time'][bz_start]
+                brake_zones.append({
+                    "Zone": len(brake_zones) + 1,
+                    "Start (m)": f"{dist[bz_start]:.0f}",
+                    "Distance (m)": f"{d_brake:.0f}",
+                    "V entry (km/h)": f"{v_entry:.0f}",
+                    "V exit (km/h)": f"{v_exit:.0f}",
+                    "ΔV (km/h)": f"{v_entry - v_exit:.0f}",
+                    "Peak G": f"{peak_decel:.2f}",
+                    "Duration (s)": f"{t_brake:.2f}",
+                })
+    if brake_zones:
+        st.dataframe(pd.DataFrame(brake_zones), width='stretch')
+        st.caption(f"Total braking zones detected: **{len(brake_zones)}** "
+                   f"(threshold: {brake_threshold} G)")
+    else:
+        st.info("No significant braking zones detected.")
+
+    # ── Friction Utilization ─────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🔵 Friction Utilization")
+    mu_used = np.sqrt(alon_g**2 + alat_g**2)
+    mu_available = np.full_like(mu_used,
+                                float(res.get('grip_mult', np.ones(1))[-1])
+                                * (st.session_state.vehicle_params.tire.friction_coefficient
+                                   if hasattr(st.session_state.vehicle_params, 'tire')
+                                   else 1.1))
+    mu_util_pct = np.clip(mu_used / mu_available * 100, 0, 100)
+
+    col_mu1, col_mu2 = st.columns(2)
+    with col_mu1:
+        fig_mu = go.Figure()
+        fig_mu.add_trace(go.Scatter(
+            x=dist, y=mu_util_pct, mode='lines',
+            name='μ utilization', line=dict(color='coral', width=2)))
+        fig_mu.add_hline(y=90, line_dash='dash', line_color='green',
+                         annotation_text='90% target')
+        fig_mu.update_layout(title='Friction Utilization (%)', height=280,
+                             yaxis_title='%', xaxis_title='Distance (m)',
+                             margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_mu, width='stretch')
+
+    with col_mu2:
+        # Friction circle filled
+        fig_fc = go.Figure()
+        theta = np.linspace(0, 2 * np.pi, 100)
+        mu_peak = float(np.mean(mu_available))
+        fig_fc.add_trace(go.Scatter(
+            x=mu_peak * np.cos(theta), y=mu_peak * np.sin(theta),
+            mode='lines', name='Available μ',
+            line=dict(color='gray', dash='dash', width=1)))
+        fig_fc.add_trace(go.Scatter(
+            x=alat_g, y=alon_g, mode='markers',
+            marker=dict(size=2, color=v_kmh, colorscale='Viridis',
+                        colorbar=dict(title='km/h')),
+            name='Actual'))
+        fig_fc.update_layout(
+            title='Friction Circle (G-G)',
+            xaxis_title='Lat G', yaxis_title='Long G',
+            height=350, margin=dict(l=0, r=0, t=30, b=0))
+        fig_fc.update_yaxes(scaleanchor='x', scaleratio=1)
+        st.plotly_chart(fig_fc, width='stretch')
+
+    mu_avg = float(np.mean(mu_util_pct))
+    mu_p90 = float(np.percentile(mu_util_pct, 90))
+    c_mu1, c_mu2, c_mu3 = st.columns(3)
+    c_mu1.metric("Avg μ Utilization", f"{mu_avg:.1f} %")
+    c_mu2.metric("P90 μ Utilization", f"{mu_p90:.1f} %")
+    c_mu3.metric("Peak Combined G", f"{float(np.max(mu_used)):.2f} G")
+
+    # ── RPM / Power Histogram ────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📊 RPM & Gear Distribution")
+    col_h1, col_h2 = st.columns(2)
+    with col_h1:
+        rpm_data = res['rpm']
+        rpm_data = rpm_data[rpm_data > 0]
+        fig_rpm_hist = go.Figure()
+        fig_rpm_hist.add_trace(go.Histogram(
+            x=rpm_data, nbinsx=30,
+            marker_color='mediumpurple', name='RPM'))
+        fig_rpm_hist.update_layout(
+            title='RPM Distribution', height=300,
+            xaxis_title='RPM', yaxis_title='Count',
+            margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_rpm_hist, width='stretch')
+
+    with col_h2:
+        gear_data = res['gear']
+        gear_counts = pd.Series(gear_data).value_counts().sort_index()
+        fig_gear = go.Figure(go.Bar(
+            x=[f"Gear {int(g)}" for g in gear_counts.index],
+            y=gear_counts.values / len(gear_data) * 100,
+            marker_color='steelblue',
+            text=[f"{v:.1f}%" for v in gear_counts.values /
+                  len(gear_data) * 100],
+            textposition='outside',
+        ))
+        fig_gear.update_layout(
+            title='Gear Usage (%)', height=300,
+            yaxis_title='% of lap', margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_gear, width='stretch')
+
+    # ── Gap Analysis (multi-run) ─────────────────────────────────
+    all_res = st.session_state.get('all_results', [])
+    if len(all_res) > 1:
+        st.markdown("---")
+        st.subheader("📈 Gap Analysis — Distance Domain")
+        st.caption("Time difference (Δt) between the first run and subsequent "
+                   "runs at each distance point.")
+
+        ref = all_res[0]
+        ref_dist = ref['result_obj']['distance']
+        ref_time = ref['result_obj']['time']
+        colors_gap = px.colors.qualitative.Plotly
+
+        fig_gap = go.Figure()
+        for idx, run in enumerate(all_res[1:], 1):
+            run_dist = run['result_obj']['distance']
+            run_time = run['result_obj']['time']
+            # Interpolate to common distance grid
+            common_dist = np.linspace(0, min(ref_dist[-1], run_dist[-1]), 500)
+            ref_t_interp = np.interp(common_dist, ref_dist, ref_time)
+            run_t_interp = np.interp(common_dist, run_dist, run_time)
+            delta_t = run_t_interp - ref_t_interp
+            fig_gap.add_trace(go.Scatter(
+                x=common_dist, y=delta_t, mode='lines',
+                name=f'{run["label"]} vs {ref["label"]}',
+                line=dict(color=colors_gap[idx % len(colors_gap)], width=2),
+            ))
+        fig_gap.add_hline(y=0, line_dash='dash', line_color='gray')
+        fig_gap.update_layout(
+            title=f'Δt vs "{ref["label"]}" (+ = slower)',
+            xaxis_title='Distance (m)', yaxis_title='Δ time (s)',
+            height=350, margin=dict(l=0, r=0, t=40, b=0))
+        st.plotly_chart(fig_gap, width='stretch')
+
+    # --- HTML Export ---
+    st.markdown("---")
+    st.subheader("📄 HTML Report Export")
+    if st.button("📄 Export all charts as HTML", width='stretch'):
+        figs_html = [
+            fig_map, fig_v, fig_a, fig_temp, fig_press, fig_rpm, fig_ggv,
+        ]
+        fig_names = [
+            "Speed Map", "Speed", "Long & Lat G", "Tyre Temp",
+            "Tyre Pressure", "RPM & Gear", "GGV Diagram",
+        ]
+        html_parts = [
+            "<html><head><meta charset='utf-8'>"
+            "<title>LapTimeSimulator Report</title></head><body>"
+            f"<h1>LapTimeSimulator Report — {fmt_laptime(res['lap_time'])}</h1>"
+            f"<p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>"
+        ]
+        for name, fig in zip(fig_names, figs_html):
+            html_parts.append(f"<h2>{name}</h2>")
+            html_parts.append(pio.to_html(
+                fig, full_html=False, include_plotlyjs='cdn'))
+        html_parts.append("</body></html>")
+        full_html = "\n".join(html_parts)
+        st.download_button(
+            label="📥 Download HTML report",
+            data=full_html, file_name="lap_report.html",
+            mime="text/html",
+        )
+
     # --- Setup comparison table ---
     all_res = st.session_state.get('all_results', [])
     if len(all_res) > 1:
@@ -643,13 +907,252 @@ def resultados_page():
 
 
 # ---------------------------------------------------------------------------
+# PAGE: Compare (CSV Upload)
+# ---------------------------------------------------------------------------
+_KNOWN_COLUMNS = {
+    # Current solver CSV columns → internal key mapping
+    "Distance": "distance", "Time": "time", "Speed": "speed_kmh",
+    "Engine_RPM": "rpm", "Gear": "gear",
+    "G_Long": "g_long", "G_Lat": "g_lat",
+    "Throttle_Pos": "throttle_pct", "Brake_Press": "brake_pct",
+    "Steering_Angle_deg": "steering_deg", "Roll_Angle_deg": "roll_deg",
+    "Front_Slip_Angle_deg": "slip_deg",
+    "Fuel_Cons_Accum_L": "fuel_l", "Tyre_Temp_C": "tyre_temp",
+    "Tyre_Press_bar": "tyre_press", "Corner_Radius_m": "radius",
+    # Legacy CSV columns
+    "distance_m": "distance", "v_kmh": "speed_kmh",
+    "a_long_ms2": "g_long", "a_lat_ms2": "g_lat",
+    "time_s": "time", "temp_pneu_c": "tyre_temp", "consumo_l": "fuel_l",
+    "radius_m": "radius",
+}
+
+
+def _parse_uploaded_csv(uploaded) -> dict | None:
+    """Parse an uploaded CSV and return a normalised dict of arrays."""
+    try:
+        df = pd.read_csv(uploaded)
+    except Exception:
+        return None
+    df.columns = [c.strip() for c in df.columns]
+    out: dict[str, np.ndarray] = {}
+    for col in df.columns:
+        key = _KNOWN_COLUMNS.get(col, col.lower().replace(" ", "_"))
+        out[key] = df[col].values
+    return out
+
+
+def compare_page():
+    st.header("📊 Compare — CSV Upload")
+    st.caption(
+        "Upload one or more CSV telemetry files (exported from the simulator "
+        "or MoTeC / PiToolbox) and overlay them against the current simulation."
+    )
+
+    uploaded_files = st.file_uploader(
+        "Drop CSV files here", type=["csv"], accept_multiple_files=True,
+    )
+
+    datasets: list[tuple[str, dict]] = []
+
+    # Current sim data (if available)
+    res = st.session_state.get("resultados")
+    if res is not None:
+        datasets.append(("Sim (current)", {
+            "distance": res["distance"],
+            "speed_kmh": res["v_profile"] * 3.6,
+            "g_long": res["a_long"] / 9.81,
+            "g_lat": res["a_lat"] / 9.81,
+            "throttle_pct": res.get("throttle_pct", np.zeros(len(res["distance"]))),
+            "brake_pct": res.get("brake_pct", np.zeros(len(res["distance"]))),
+            "steering_deg": res.get("steering_deg", np.zeros(len(res["distance"]))),
+            "tyre_temp": res.get("temp_pneu", np.zeros(len(res["distance"]))),
+        }))
+
+    if uploaded_files:
+        for uf in uploaded_files:
+            parsed = _parse_uploaded_csv(uf)
+            if parsed is None:
+                st.warning(f"⚠️ Could not parse **{uf.name}**")
+                continue
+            datasets.append((uf.name, parsed))
+
+    if len(datasets) < 1:
+        st.info("Upload at least one CSV file, or run a simulation first.")
+        return
+
+    colors = px.colors.qualitative.Plotly
+    channel_defs = [
+        ("speed_kmh", "Speed (km/h)"),
+        ("g_long",    "Longitudinal G"),
+        ("g_lat",     "Lateral G"),
+        ("throttle_pct", "Throttle (%)"),
+        ("brake_pct", "Brake (%)"),
+        ("steering_deg", "Steering Angle (°)"),
+        ("tyre_temp", "Tyre Temperature (°C)"),
+    ]
+
+    for key, title in channel_defs:
+        has_data = any(key in d for _, d in datasets)
+        if not has_data:
+            continue
+        fig = go.Figure()
+        for idx, (name, data) in enumerate(datasets):
+            if key not in data:
+                continue
+            x = data.get("distance", np.arange(len(data[key])))
+            fig.add_trace(go.Scatter(
+                x=x, y=data[key], mode="lines",
+                name=name, line=dict(color=colors[idx % len(colors)], width=2),
+            ))
+        fig.update_layout(
+            title=title, xaxis_title="Distance (m)", height=300,
+            margin=dict(l=0, r=0, t=35, b=0),
+        )
+        st.plotly_chart(fig, width='stretch')
+
+
+# ---------------------------------------------------------------------------
+# PAGE: Setup Optimization
+# ---------------------------------------------------------------------------
+def optimization_page():
+    st.header("🔧 Setup Optimization")
+
+    if not FLEET_AVAILABLE:
+        st.error("Fleet module not available.")
+        return
+    if st.session_state.circuit is None:
+        st.warning("⚠️ Select a track in the 'Track' tab first.")
+        return
+
+    mode = st.session_state.get("vehicle_mode", "Copa Truck")
+    if mode != "Porsche GT3 Cup":
+        st.warning(
+            "Setup optimisation is only available in **Porsche GT3 Cup** mode.")
+        return
+
+    st.caption(
+        "Grid-search over ARB front, ARB rear and Wing position to find the "
+        "fastest setup combination. Tyre pressure and brake bias are held constant."
+    )
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        pressure = st.number_input("Tyre Pressure (bar)", 1.4, 2.4, 1.8, step=0.05,
+                                   key="opt_pressure")
+    with col_p2:
+        bias = st.slider("Brake Bias", -2.0, 0.0, -1.0, step=0.5,
+                         key="opt_bias")
+
+    col_r1, col_r2, col_r3 = st.columns(3)
+    with col_r1:
+        arb_f_range = st.slider("ARB Front range", 1, 7,
+                                (1, 7), key="opt_arb_f")
+    with col_r2:
+        arb_r_range = st.slider("ARB Rear range", 1, 7,
+                                (1, 7), key="opt_arb_r")
+    with col_r3:
+        wing_range = st.slider("Wing range", 1, 9, (1, 9), key="opt_wing")
+
+    arb_f_vals = list(range(arb_f_range[0], arb_f_range[1] + 1))
+    arb_r_vals = list(range(arb_r_range[0], arb_r_range[1] + 1))
+    wing_vals = list(range(wing_range[0], wing_range[1] + 1))
+    total = len(arb_f_vals) * len(arb_r_vals) * len(wing_vals)
+
+    st.info(f"Total combinations: **{total}** (ARB-F: {len(arb_f_vals)} × "
+            f"ARB-R: {len(arb_r_vals)} × Wing: {len(wing_vals)})")
+
+    if st.button("🚀 Run Optimisation", width='stretch', type="primary"):
+        base = get_vehicle_by_id(st.session_state.vehicle_id)
+        circuit = st.session_state.circuit
+        results_opt: list[dict] = []
+
+        bar = st.progress(0, text="Running grid search...")
+        t0 = time.perf_counter()
+
+        for idx, (af, ar, w) in enumerate(product(arb_f_vals, arb_r_vals, wing_vals)):
+            bar.progress((idx + 1) / total,
+                         text=f"Combo {idx+1}/{total} — ARB {af}/{ar} Wing {w}")
+
+            setup = VehicleSetup(
+                arb_front=af, arb_rear=ar, wing_position=w,
+                tyre_pressure=float(pressure), brake_bias=float(bias),
+                setup_name=f"ARB{af}/{ar}_W{w}",
+            )
+            params = apply_setup(base, setup)
+            params_dict = params.to_solver_dict()
+
+            try:
+                r = _cached_solver(
+                    params_dict=params_dict, circuit=circuit,
+                    config={"gear_min": 1}, save_csv=False,
+                )
+                results_opt.append({
+                    "arb_f": af, "arb_r": ar, "wing": w,
+                    "lap_time": r["lap_time"],
+                    "vmax_kmh": float(np.max(r["v_profile"])) * 3.6,
+                    "vmean_kmh": float(np.mean(r["v_profile"])) * 3.6,
+                })
+            except Exception:
+                results_opt.append({
+                    "arb_f": af, "arb_r": ar, "wing": w,
+                    "lap_time": float("inf"),
+                    "vmax_kmh": 0.0, "vmean_kmh": 0.0,
+                })
+
+        elapsed = time.perf_counter() - t0
+        bar.empty()
+
+        df_opt = pd.DataFrame(results_opt)
+        best = df_opt.loc[df_opt["lap_time"].idxmin()]
+
+        st.success(
+            f"✅ Optimisation complete in {elapsed:.1f}s — "
+            f"Best: **ARB {int(best.arb_f)}/{int(best.arb_r)} Wing {int(best.wing)}** "
+            f"→ **{fmt_laptime(best.lap_time)}**"
+        )
+
+        # Top 10 table
+        st.subheader("🏆 Top 10 Setups")
+        top10 = df_opt.nsmallest(10, "lap_time").copy()
+        top10["Lap Time"] = top10["lap_time"].apply(fmt_laptime)
+        top10.columns = [c.replace("_", " ").title() for c in top10.columns]
+        st.dataframe(top10, width='stretch')
+
+        # Heatmaps — one per wing position
+        st.subheader("🗺️ Lap-Time Heatmaps (ARB Front × ARB Rear)")
+        for w in wing_vals:
+            sub = df_opt[df_opt["wing"] == w]
+            if sub.empty:
+                continue
+            pivot = sub.pivot(index="arb_r", columns="arb_f",
+                              values="lap_time")
+            fig_hm = go.Figure(go.Heatmap(
+                z=pivot.values,
+                x=[str(c) for c in pivot.columns],
+                y=[str(r) for r in pivot.index],
+                colorscale='RdYlGn_r',
+                colorbar=dict(title='Lap (s)'),
+                text=[[fmt_laptime(v) for v in row] for row in pivot.values],
+                texttemplate="%{text}",
+            ))
+            fig_hm.update_layout(
+                title=f'Wing = {w}',
+                xaxis_title='ARB Front', yaxis_title='ARB Rear',
+                height=350, margin=dict(l=0, r=0, t=40, b=0),
+            )
+            st.plotly_chart(fig_hm, width='stretch')
+
+
+# ---------------------------------------------------------------------------
 # APP ENTRY POINT
 # ---------------------------------------------------------------------------
 PAGES = {
-    "🚗 Parameters":   parametros_veiculo_page,
-    "🗭️ Track":        pista_page,
-    "▶️ Simulation":   simulacao_page,
-    "🏁 Results":      resultados_page,
+    "🚗 Parameters":    parametros_veiculo_page,
+    "🗺️ Track":         pista_page,
+    "▶️ Simulation":    simulacao_page,
+    "🏁 Results":       resultados_page,
+    "📊 Compare":       compare_page,
+    "🔧 Optimization":  optimization_page,
 }
 
 st.set_page_config(page_title="LapTimeSimulator — Copa Truck / GT3",
