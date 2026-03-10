@@ -62,28 +62,29 @@ from .circuit import CircuitData
 #  27  Apex Mergulho (C10)
 #  28  Saída Mergulho / Reta Principal (fechar loop)
 # ---------------------------------------------------------------------------
+# 29 waypoints sampled from the validated HDF5 Interlagos centreline.
+# Coordinates are local ENU [m] matching the HDF5 circuit exactly.
 _WP_X = np.array([
-    0.0,    60.0,   130.0,   210.0,   290.0,   380.0,
-    470.0,   540.0,   610.0,   660.0,   700.0,   750.0,
-    820.0,   870.0,   900.0,   940.0,   990.0,  1050.0,
-    1100.0,  1150.0,  1170.0,  1140.0,  1080.0,  1010.0,
-    940.0,   870.0,   800.0,   680.0,   550.0,
+    -0.5,    36.9,    78.1,   190.4,   326.7,
+    441.1,   481.0,   517.1,   554.4,   592.1,
+    544.8,   400.3,   308.7,   224.8,   112.5,
+    10.6,    45.2,   139.6,    48.6,    94.6,
+    208.6,   321.7,   387.6,   258.7,   115.2,
+    6.2,   -30.1,   -60.6,   -40.8,
 ])
 
 _WP_Y = np.array([
-    0.0,    80.0,   170.0,   220.0,   160.0,    90.0,
-    30.0,   -30.0,  -120.0,  -220.0,  -310.0,  -400.0,
-    -490.0,  -590.0,  -700.0,  -760.0,  -790.0,  -750.0,
-    -680.0,  -590.0,  -480.0,  -390.0,  -330.0,  -290.0,
-    -270.0,  -220.0,  -150.0,   -80.0,   -20.0,
+    -0.5,  -140.5,  -284.6,  -276.9,  -309.5,
+    -225.4,   -81.1,    59.3,   204.5,   349.6,
+    456.3,   439.6,   322.1,   203.9,   121.3,
+    213.7,   326.9,   355.6,   472.4,   538.1,
+    456.9,   537.8,   670.0,   721.6,   681.3,
+    583.4,   443.3,   296.7,   149.1,
 ])
 
-# Scale factor: raw waypoints produce ~3402 m; FIA-homologated length is 4.309 km
-_SCALE = 4309.0 / 3402.0
-
-# Close the loop for periodic spline (scaled to correct arc-length)
-_WP_X_CLOSED = np.append(_WP_X, _WP_X[0]) * _SCALE
-_WP_Y_CLOSED = np.append(_WP_Y, _WP_Y[0]) * _SCALE
+# Close the loop for periodic spline
+_WP_X_CLOSED = np.append(_WP_X, _WP_X[0])
+_WP_Y_CLOSED = np.append(_WP_Y, _WP_Y[0])
 
 # Track width at each waypoint [m]  (FIA sector widths, clamped 9–16 m)
 _TRACK_WIDTH = np.array([

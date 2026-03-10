@@ -274,15 +274,15 @@ def pista_page():
     st.session_state.circuit_meta = meta
 
     fig = go.Figure()
-    fig.add_trace(go.Scattergl(x=plot_data['x_c'],    y=plot_data['y_c'],
-                               mode="lines", name="Centerline",
-                               line=dict(color="royalblue", width=2)))
-    fig.add_trace(go.Scattergl(x=plot_data['left_x'], y=plot_data['left_y'],
-                               mode="lines", name="Left",
-                               line=dict(color='limegreen', dash='dot', width=1)))
-    fig.add_trace(go.Scattergl(x=plot_data['right_x'], y=plot_data['right_y'],
-                               mode="lines", name="Right",
-                               line=dict(color='tomato', dash='dot', width=1)))
+    fig.add_trace(go.Scatter(x=plot_data['x_c'],    y=plot_data['y_c'],
+                             mode="lines", name="Centerline",
+                             line=dict(color="royalblue", width=2)))
+    fig.add_trace(go.Scatter(x=plot_data['left_x'], y=plot_data['left_y'],
+                             mode="lines", name="Left",
+                             line=dict(color='limegreen', dash='dot', width=1)))
+    fig.add_trace(go.Scatter(x=plot_data['right_x'], y=plot_data['right_y'],
+                             mode="lines", name="Right",
+                             line=dict(color='tomato', dash='dot', width=1)))
     fig.update_layout(title=meta['name'], xaxis_title="x (m)", yaxis_title="y (m)",
                       margin=dict(l=0, r=0, t=35, b=0), height=450)
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
@@ -463,7 +463,7 @@ def resultados_page():
     y_c = circuit.centerline_y
     n = min(len(x_c), len(v_kmh))
     fig_map = go.Figure()
-    fig_map.add_trace(go.Scattergl(
+    fig_map.add_trace(go.Scatter(
         x=x_c[:n], y=y_c[:n], mode='markers',
         marker=dict(
             size=3,
@@ -489,18 +489,18 @@ def resultados_page():
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         fig_v = go.Figure()
-        fig_v.add_trace(go.Scattergl(x=dist, y=v_kmh, mode='lines',
-                                     name='Speed', line=dict(color='royalblue', width=2)))
+        fig_v.add_trace(go.Scatter(x=dist, y=v_kmh, mode='lines',
+                                   name='Speed', line=dict(color='royalblue', width=2)))
         fig_v.update_layout(title='Speed (km/h)', height=280,
                             margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig_v, width='stretch')
 
     with col_g2:
         fig_a = go.Figure()
-        fig_a.add_trace(go.Scattergl(x=dist, y=alat_g, mode='lines',
-                                     name='Lat G', line=dict(color='tomato', width=2)))
-        fig_a.add_trace(go.Scattergl(x=dist, y=alon_g, mode='lines',
-                                     name='Long G', line=dict(color='seagreen', width=2)))
+        fig_a.add_trace(go.Scatter(x=dist, y=alat_g, mode='lines',
+                                   name='Lat G', line=dict(color='tomato', width=2)))
+        fig_a.add_trace(go.Scatter(x=dist, y=alon_g, mode='lines',
+                                   name='Long G', line=dict(color='seagreen', width=2)))
         fig_a.update_layout(title='Longitudinal & Lateral G', height=280,
                             margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig_a, width='stretch')
@@ -508,9 +508,9 @@ def resultados_page():
     col_g3, col_g4 = st.columns(2)
     with col_g3:
         fig_temp = go.Figure()
-        fig_temp.add_trace(go.Scattergl(x=dist, y=res['temp_pneu'], mode='lines',
-                                        name='Tyre Temp',
-                                        line=dict(color='darkorange', width=2)))
+        fig_temp.add_trace(go.Scatter(x=dist, y=res['temp_pneu'], mode='lines',
+                                      name='Tyre Temp',
+                                      line=dict(color='darkorange', width=2)))
         fig_temp.add_hline(y=95.0, line_dash='dash', line_color='green',
                            annotation_text='Optimum')
         fig_temp.update_layout(title='Tyre Temperature (°C)', height=280,
@@ -519,9 +519,9 @@ def resultados_page():
 
     with col_g4:
         fig_press = go.Figure()
-        fig_press.add_trace(go.Scattergl(x=dist, y=res['pressao_pneu'], mode='lines',
-                                         name='Tyre Press',
-                                         line=dict(color='teal', width=2)))
+        fig_press.add_trace(go.Scatter(x=dist, y=res['pressao_pneu'], mode='lines',
+                                       name='Tyre Press',
+                                       line=dict(color='teal', width=2)))
         fig_press.update_layout(title='Tyre Pressure (bar)', height=280,
                                 margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig_press, width='stretch')
@@ -529,11 +529,11 @@ def resultados_page():
     col_g5, col_g6 = st.columns(2)
     with col_g5:
         fig_rpm = go.Figure()
-        fig_rpm.add_trace(go.Scattergl(x=dist, y=res['rpm'], mode='lines',
-                                       name='RPM', line=dict(color='purple', width=2)))
-        fig_rpm.add_trace(go.Scattergl(x=dist, y=res['gear'] * 1000, mode='lines',
-                                       name='Gear ×1000', line=dict(color='gray',
-                                                                    width=1, dash='dot')))
+        fig_rpm.add_trace(go.Scatter(x=dist, y=res['rpm'], mode='lines',
+                                     name='RPM', line=dict(color='purple', width=2)))
+        fig_rpm.add_trace(go.Scatter(x=dist, y=res['gear'] * 1000, mode='lines',
+                                     name='Gear ×1000', line=dict(color='gray',
+                                                                  width=1, dash='dot')))
         fig_rpm.update_layout(title='Engine RPM + Gear (×1000)', height=280,
                               margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig_rpm, width='stretch')
@@ -558,24 +558,54 @@ def resultados_page():
     with col_g7:
         if 'roll_angle_profile' in res:
             fig_roll = go.Figure()
-            fig_roll.add_trace(go.Scattergl(
+            fig_roll.add_trace(go.Scatter(
                 x=dist, y=res['roll_angle_profile'], mode='lines',
                 name='Roll angle', line=dict(color='sienna', width=2)))
             fig_roll.update_layout(title='Cabin Roll Angle (°)', height=280,
                                    margin=dict(l=0, r=0, t=30, b=0))
             st.plotly_chart(fig_roll, width='stretch')
     with col_g8:
-        if 'front_slip_angle_deg' in res or True:
-            slip_key = 'front_slip_angle_deg' if 'front_slip_angle_deg' in res else None
-            slip_data = res.get('front_slip_angle_deg',
-                                res.get('slip_angle_est', np.zeros(len(dist))))
-            fig_slip = go.Figure()
-            fig_slip.add_trace(go.Scattergl(
-                x=dist, y=slip_data, mode='lines',
-                name='Slip angle', line=dict(color='darkviolet', width=2)))
-            fig_slip.update_layout(title='Front Slip Angle (°)', height=280,
-                                   margin=dict(l=0, r=0, t=30, b=0))
-            st.plotly_chart(fig_slip, width='stretch')
+        slip_data = res.get('front_slip_angle_deg', np.zeros(len(dist)))
+        fig_slip = go.Figure()
+        fig_slip.add_trace(go.Scatter(
+            x=dist, y=slip_data, mode='lines',
+            name='Slip angle', line=dict(color='darkviolet', width=2)))
+        fig_slip.update_layout(title='Front Slip Angle (°)', height=280,
+                               margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_slip, width='stretch')
+
+    # --- Driver Inputs ---
+    st.markdown("---")
+    st.subheader("🎮 Driver Inputs")
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        fig_pedals = go.Figure()
+        fig_pedals.add_trace(go.Scatter(
+            x=dist, y=res.get('throttle_pct', np.zeros(len(dist))),
+            mode='lines', name='Throttle %',
+            line=dict(color='limegreen', width=2)))
+        fig_pedals.add_trace(go.Scatter(
+            x=dist, y=res.get('brake_pct', np.zeros(len(dist))),
+            mode='lines', name='Brake %',
+            line=dict(color='red', width=2)))
+        fig_pedals.update_layout(
+            title='Throttle & Brake (%)', height=280,
+            yaxis_title='%', xaxis_title='Distance (m)',
+            margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_pedals, width='stretch')
+
+    with col_d2:
+        fig_steer = go.Figure()
+        fig_steer.add_trace(go.Scatter(
+            x=dist, y=res.get('steering_deg', np.zeros(len(dist))),
+            mode='lines', name='Steering',
+            line=dict(color='dodgerblue', width=2)))
+        fig_steer.update_layout(
+            title='Steering Angle (°)', height=280,
+            yaxis_title='deg', xaxis_title='Distance (m)',
+            margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_steer, width='stretch')
 
     # --- Setup comparison table ---
     all_res = st.session_state.get('all_results', [])
