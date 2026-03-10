@@ -8,8 +8,3 @@ scikit-learn
 seaborn
 pyyaml
 h5py
-tensorflow
-torch
-transformers
-flask
-fastapi
