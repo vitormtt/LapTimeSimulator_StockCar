@@ -2,17 +2,7 @@
 KPI dashboard module for lap time simulation results.
 
 Provides Plotly-based chart builders and KPI summary tables that consume
-SimulationResult objects. Designed for use in Streamlit interface and
-standalone script reporting.
-
-All functions return Plotly Figure objects (or pandas DataFrames) so
-they can be rendered with st.plotly_chart() or df.to_csv().
-
-References
-----------
-Segers, J. (2014). Analysis Techniques for Racecar Data Acquisition,
-  2nd Ed. SAE International.
-Pi Toolbox Apostila de Treinamento — Porsche Carrera Cup Brasil (2014).
+SimulationResult objects.
 """
 
 from __future__ import annotations
@@ -24,27 +14,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from src.simulation.lap_time_solver import SimulationResult
+from ..simulation.lap_time_solver import SimulationResult
 
-
-# ---------------------------------------------------------------------------
-# KPI table
-# ---------------------------------------------------------------------------
 
 def build_kpi_dataframe(results: List[SimulationResult]) -> pd.DataFrame:
-    """
-    Build a KPI summary DataFrame from one or more SimulationResult objects.
-
-    Parameters
-    ----------
-    results : list[SimulationResult]
-        One or more simulation results to compare.
-
-    Returns
-    -------
-    pd.DataFrame
-        Rows = KPI names, Columns = setup/run labels.
-    """
+    """Build a KPI summary DataFrame from one or more SimulationResult objects."""
     rows = []
     for r in results:
         rows.append({
@@ -65,18 +39,7 @@ def build_kpi_dataframe(results: List[SimulationResult]) -> pd.DataFrame:
 
 
 def compare_lap_times(results: List[SimulationResult]) -> pd.DataFrame:
-    """
-    Build a compact lap time comparison table with delta to fastest run.
-
-    Parameters
-    ----------
-    results : list[SimulationResult]
-        At least two results to compare.
-
-    Returns
-    -------
-    pd.DataFrame
-    """
+    """Build a compact lap time comparison table with delta to fastest run."""
     base_time = min(r.lap_time for r in results)
     rows = []
     for r in results:
@@ -90,30 +53,12 @@ def compare_lap_times(results: List[SimulationResult]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ---------------------------------------------------------------------------
-# GG diagram
-# ---------------------------------------------------------------------------
-
 def plot_gg_diagram(
     result: SimulationResult,
     title: Optional[str] = None,
     height: int = 500,
 ) -> go.Figure:
-    """
-    Plot GG (traction circle) diagram: ax_long vs ay_lat.
-
-    Colour encodes speed (km/h) to show where limits are reached.
-
-    Parameters
-    ----------
-    result : SimulationResult
-    title : str | None
-    height : int
-
-    Returns
-    -------
-    go.Figure
-    """
+    """Plot GG (traction circle) diagram: ax_long vs ay_lat."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=result.ay_lat_g,
@@ -127,51 +72,29 @@ def plot_gg_diagram(
             colorbar=dict(title="Speed (km/h)"),
         ),
         name="GG",
-        hovertemplate=(
-            "ay: %{x:.3f} g<br>ax: %{y:.3f} g<br>"
-            "v: %{marker.color:.1f} km/h<extra></extra>"
-        ),
+        hovertemplate="ay: %{x:.3f} g<br>ax: %{y:.3f} g<br>v: %{marker.color:.1f} km/h<extra></extra>",
     ))
     fig.update_layout(
         title=title or f"GG Diagram — {result.setup_name}",
         xaxis_title="Lateral acceleration (g)",
         yaxis_title="Longitudinal acceleration (g)",
         height=height,
-        xaxis=dict(zeroline=True, zerolinewidth=1),
-        yaxis=dict(zeroline=True, zerolinewidth=1),
+        xaxis=dict(zeroline=True),
+        yaxis=dict(zeroline=True),
     )
     return fig
 
-
-# ---------------------------------------------------------------------------
-# Speed vs distance
-# ---------------------------------------------------------------------------
 
 def plot_speed_vs_distance(
     results: List[SimulationResult],
     height: int = 350,
 ) -> go.Figure:
-    """
-    Overlay speed traces for multiple simulation results.
-
-    Useful for back-to-back setup or mode comparison.
-
-    Parameters
-    ----------
-    results : list[SimulationResult]
-    height : int
-
-    Returns
-    -------
-    go.Figure
-    """
+    """Overlay speed traces for multiple simulation results."""
     fig = go.Figure()
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
     for i, r in enumerate(results):
         fig.add_trace(go.Scatter(
-            x=r.distance,
-            y=r.v_kmh,
-            mode="lines",
+            x=r.distance, y=r.v_kmh, mode="lines",
             name=f"{r.mode.name} | {r.setup_name} ({r.lap_time:.2f}s)",
             line=dict(width=2, color=colors[i % len(colors)]),
         ))
@@ -185,44 +108,25 @@ def plot_speed_vs_distance(
     return fig
 
 
-# ---------------------------------------------------------------------------
-# Multi-channel vs distance
-# ---------------------------------------------------------------------------
-
 def plot_channels_vs_distance(
     result: SimulationResult,
     channels: Optional[List[str]] = None,
     height: int = 600,
 ) -> go.Figure:
-    """
-    Plot multiple telemetry channels vs distance in stacked subplots.
-
-    Parameters
-    ----------
-    result : SimulationResult
-    channels : list[str] | None
-        Channel names to plot. Defaults to:
-        ['v_kmh', 'throttle_pct', 'brake_pct', 'gear', 'rpm', 'temp_tyre_c'].
-    height : int
-
-    Returns
-    -------
-    go.Figure
-    """
+    """Plot multiple telemetry channels vs distance in stacked subplots."""
     _CHANNEL_META = {
-        "v_kmh":           ("Speed",         "km/h",  "#1f77b4"),
-        "throttle_pct":    ("Throttle",       "%",      "#2ca02c"),
-        "brake_pct":       ("Brake",          "%",      "#d62728"),
-        "steering_deg":    ("Steering",       "deg",   "#ff7f0e"),
-        "gear":            ("Gear",           "-",      "#9467bd"),
-        "rpm":             ("RPM",            "rpm",   "#8c564b"),
-        "ax_long_g":       ("ax long",        "g",      "#e377c2"),
-        "ay_lat_g":        ("ay lat",         "g",      "#17becf"),
-        "temp_tyre_c":     ("Tyre Temp",      "\u00b0C",  "#bcbd22"),
-        "tyre_pressure_bar":("Tyre Press",    "bar",   "#7f7f7f"),
-        "fuel_used_l":     ("Fuel",           "L",      "#aec7e8"),
+        "v_kmh":            ("Speed",         "km/h",  "#1f77b4"),
+        "throttle_pct":     ("Throttle",       "%",      "#2ca02c"),
+        "brake_pct":        ("Brake",          "%",      "#d62728"),
+        "steering_deg":     ("Steering",       "deg",   "#ff7f0e"),
+        "gear":             ("Gear",           "-",      "#9467bd"),
+        "rpm":              ("RPM",            "rpm",   "#8c564b"),
+        "ax_long_g":        ("ax long",        "g",      "#e377c2"),
+        "ay_lat_g":         ("ay lat",         "g",      "#17becf"),
+        "temp_tyre_c":      ("Tyre Temp",      "\u00b0C",  "#bcbd22"),
+        "tyre_pressure_bar":("Tyre Press",     "bar",   "#7f7f7f"),
+        "fuel_used_l":      ("Fuel",           "L",      "#aec7e8"),
     }
-
     if channels is None:
         channels = ["v_kmh", "throttle_pct", "brake_pct", "gear", "rpm", "temp_tyre_c"]
 
@@ -233,28 +137,20 @@ def plot_channels_vs_distance(
         vertical_spacing=0.03,
         subplot_titles=[_CHANNEL_META.get(c, (c,))[0] for c in channels],
     )
-
     for row, ch in enumerate(channels, start=1):
         data = getattr(result, ch, None)
         if data is None:
             continue
         label, unit, color = _CHANNEL_META.get(ch, (ch, "-", "gray"))
         fig.add_trace(
-            go.Scatter(
-                x=result.distance,
-                y=data,
-                mode="lines",
-                name=label,
-                line=dict(color=color, width=1.5),
-                showlegend=False,
-            ),
+            go.Scatter(x=result.distance, y=data, mode="lines",
+                       name=label, line=dict(color=color, width=1.5), showlegend=False),
             row=row, col=1,
         )
         fig.update_yaxes(title_text=unit, row=row, col=1)
-
     fig.update_xaxes(title_text="Distance (m)", row=n_ch, col=1)
     fig.update_layout(
-        title=f"Telemetry Channels — {result.setup_name} | Lap {result.lap_time:.3f}s",
+        title=f"Telemetry — {result.setup_name} | Lap {result.lap_time:.3f}s",
         height=max(height, n_ch * 120),
     )
     return fig
