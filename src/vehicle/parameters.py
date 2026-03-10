@@ -355,6 +355,103 @@ def copa_truck_2dof_default() -> VehicleParams:
     )
 
 
+def porsche_911_gt3_cup_991() -> VehicleParams:
+    """
+    Porsche 911 GT3 Cup (Type 991.1 / 991.2) parameters for bicycle model (2DOF).
+
+    Used as validation vehicle for model modularisation and lap time comparison
+    against real Porsche Carrera Cup Brasil telemetry data (Pi Toolbox / MoTeC).
+
+    Specifications sourced from:
+    - Porsche Carrera Cup Brasil — Manual Técnico 991 Fase 1 e Fase 2 (2021)
+    - Porsche 911 GT3 Cup (Type 991) Vehicle Description (IMSA / Porsche Motorsport)
+
+    Key parameters:
+    - Engine: 3.8 L flat-6 (991.1) / 4.0 L flat-6 (991.2), NA
+    - Max power: 338 kW (460 cv) @ 7500 rpm
+    - Max torque: 440 N·m @ 6250 rpm
+    - Redline: 8500 rpm (protection cut at 9000 rpm)
+    - Gearbox: 6-speed sequential (APS pneumatic actuation)
+    - Wheelbase: 2463 mm
+    - Track: front 1545 mm / rear 1530 mm (avg 1537 mm)
+    - Kerb weight: ~1200 kg (homologated min), race ~1250 kg with driver
+    - Brakes: front 380×32 mm 6-piston / rear 380×30 mm 4-piston
+    - Tyres: Michelin slick 245/650-18 front, 305/660-18 rear
+    - ARB: 7-position adjustable front and rear
+    - Rear wing: 9-position adjustable
+
+    Notes on estimated parameters:
+    - lf/lr split estimated from 40/60 front/rear weight distribution typical of 911
+    - Iz estimated via regression from similar GT3 vehicles (~1500 kg·m²)
+    - Cornering stiffness estimated for Michelin slick at nominal load/pressure
+    - Aero (Cd, Cl) at wing position 5/9 (mid-range baseline)
+    """
+    return VehicleParams(
+        mass_geometry=VehicleMassGeometry(
+            mass=1250.0,           # race weight incl. driver [kg]
+            lf=1.08,               # CG to front axle (est. 44% front bias) [m]
+            lr=1.38,               # CG to rear axle [m]
+            wheelbase=2.463,       # official wheelbase [m]
+            track_width=1.537,     # avg front/rear track [m]
+            cg_height=0.46,        # estimated CG height, low-slung GT3 [m]
+            Iz=1500.0,             # yaw inertia estimated [kg·m²]
+            Ix=320.0,              # roll inertia estimated [kg·m²]
+            Iy=1600.0,             # pitch inertia estimated [kg·m²]
+        ),
+        tire=TireParams(
+            # Michelin Pilot Sport GT slick — estimated at nominal conditions
+            cornering_stiffness_front=75000.0,   # per axle [N/rad]
+            cornering_stiffness_rear=90000.0,    # per axle, wider rear tyre [N/rad]
+            friction_coefficient=1.55,           # slick tyre on dry asphalt [-]
+            wheel_radius=0.330,                  # 18" wheel, ~330 mm eff. radius [m]
+            pacejka_B=11.5,
+            pacejka_C=1.35,
+            pacejka_D=1.55,
+            pacejka_E=0.95,
+        ),
+        aero=AeroParams(
+            drag_coefficient=0.38,    # Cd at wing pos 5 (mid), estimated [-]
+            frontal_area=1.98,        # estimated frontal area [m²]
+            lift_coefficient=-0.60,   # Cl at wing pos 5 (downforce), estimated [-]
+        ),
+        engine=EngineParams(
+            max_power=338000.0,    # 338 kW (460 cv) [W]
+            max_torque=440.0,      # 440 N·m @ 6250 rpm [N·m]
+            rpm_max=8500.0,        # operational redline [rev/min]
+            rpm_idle=1000.0,       # idle [rev/min]
+            rpm_redline=9000.0,    # ECU protection cut [rev/min]
+            # Approximate torque curve (flat-6 NA character)
+            torque_curve_rpm=[1000, 2000, 3000, 4000, 5000, 6000, 6250, 7000, 7500, 8000, 8500],
+            torque_curve_nm= [200,  280,  340,  390,  420,  438,  440,  435,  420,  380,  300],
+            max_coolant_temp=110.0,
+            max_oil_temp=140.0,
+        ),
+        transmission=TransmissionParams(
+            num_gears=6,
+            # Sequential 6-speed — ratios estimated from Porsche GT3 Cup gearbox data
+            gear_ratios=[3.091, 2.353, 1.895, 1.526, 1.250, 1.029],
+            final_drive_ratio=3.444,   # estimated final drive [−]
+            shift_time=0.05,           # APS pneumatic shift ~50 ms [s]
+            upshift_rpm=8000.0,        # suggested upshift point [rev/min]
+            downshift_rpm=4500.0,      # suggested downshift point [rev/min]
+            transmission_efficiency=0.97,
+        ),
+        brake=BrakeParams(
+            # 380×32 mm 6-piston front / 380×30 mm 4-piston rear (Porsche/Brembo)
+            max_brake_force=28000.0,   # estimated peak total brake force [N]
+            brake_balance=58.0,        # ~58% front (Porsche recommends bias −2.0 to 0) [%]
+            max_deceleration=18.0,     # ~1.8g peak decel on slicks [m/s²]
+            brake_response_time=0.05,  # ABS/hydraulic response [s]
+            abs_enabled=True,
+            abs_slip_target=0.10,      # ABS target slip ratio (slick, dry) [-]
+        ),
+        name="Porsche 911 GT3 Cup 991 (2DOF)",
+        manufacturer="Porsche",
+        year=2021,
+        category="GT3",
+    )
+
+
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
