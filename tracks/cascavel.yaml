@@ -1,0 +1,145 @@
+# Pista: Autódromo Internacional de Cascavel - Zilmar Beux
+# Fonte dos dados geométricos: Wikipedia, literatura pública e notas de engenharia.
+# Raios e comprimentos de setor são estimativas para simulação point-mass.
+# Calibrar com dados de GPS/telemetria para uso em ambiente competitivo.
+
+meta:
+  track_id: cascavel
+  official_name: "Autódromo Internacional de Cascavel - Zilmar Beux"
+  city: Cascavel
+  state: PR
+  country: BR
+  lap_length_m: 3058.0
+  direction: anti-clockwise
+  surface: asphalt_and_concrete
+  fia_grade: null
+  altitude_m: 781
+  coordinates:
+    lat: -24.9445
+    lon: -53.4560
+  season_appearances_2026:
+    - round: 2
+      date: "2026-03-29"
+      format: sprint_main
+  source_notes:
+    - "Comprimento oficial: 3058 m (12 m largura)."
+    - "8 curvas, percurso anti-horário."
+    - "Baciao: maior raio de curva do Brasil, ~290-300 m."
+    - "Média de velocidade histórica Stock Car: ~173 km/h."
+    - "Setores de raio estimados a partir de fontes públicas e imagens aéreas."
+
+# Layout em setores para o solver longitudinal (método 2-pass).
+# type: straight | corner
+# radius_m: raio da linha de corrida (null para retas)
+# length_m: comprimento do setor
+# name: identificação do ponto naão
+# calibration_confidence: low | medium | high
+
+sectors:
+  - id: 1
+    name: "Reta da largada"
+    type: straight
+    length_m: 380.0
+    radius_m: null
+    calibration_confidence: medium
+
+  - id: 2
+    name: "Curva do Bacao (entrada)"
+    type: corner
+    length_m: 120.0
+    radius_m: 290.0
+    calibration_confidence: medium
+    notes: "Eau Rouge brasileira - maior raio do pais, alta velocidade em descida."
+
+  - id: 3
+    name: "Curva do Bacao (saida)"
+    type: corner
+    length_m: 180.0
+    radius_m: 260.0
+    calibration_confidence: medium
+
+  - id: 4
+    name: "Reta do Bacao"
+    type: straight
+    length_m: 280.0
+    radius_m: null
+    calibration_confidence: medium
+
+  - id: 5
+    name: "Curva 3 - chicane entrada"
+    type: corner
+    length_m: 95.0
+    radius_m: 55.0
+    calibration_confidence: low
+
+  - id: 6
+    name: "Curva 4 - chicane saida"
+    type: corner
+    length_m: 95.0
+    radius_m: 60.0
+    calibration_confidence: low
+
+  - id: 7
+    name: "Reta intermediaria"
+    type: straight
+    length_m: 310.0
+    radius_m: null
+    calibration_confidence: medium
+
+  - id: 8
+    name: "Curva 5 - media velocidade"
+    type: corner
+    length_m: 110.0
+    radius_m: 90.0
+    calibration_confidence: low
+
+  - id: 9
+    name: "Reta setor 2"
+    type: straight
+    length_m: 250.0
+    radius_m: null
+    calibration_confidence: medium
+
+  - id: 10
+    name: "Curva 6 - hairpin"
+    type: corner
+    length_m: 130.0
+    radius_m: 35.0
+    calibration_confidence: low
+    notes: "Curva mais lenta do circuito, baixa velocidade."
+
+  - id: 11
+    name: "Reta dos boxes (parcial)"
+    type: straight
+    length_m: 350.0
+    radius_m: null
+    calibration_confidence: medium
+
+  - id: 12
+    name: "Curva 7 - media velocidade"
+    type: corner
+    length_m: 120.0
+    radius_m: 75.0
+    calibration_confidence: low
+
+  - id: 13
+    name: "Curva 8 - saida para reta"
+    type: corner
+    length_m: 100.0
+    radius_m: 100.0
+    calibration_confidence: low
+
+  - id: 14
+    name: "Reta dos boxes (final)"
+    type: straight
+    length_m: 538.0
+    radius_m: null
+    calibration_confidence: medium
+
+total_sectors: 14
+computed_length_m: 3058.0
+calibration_status: initial_estimate
+calibration_priority_data:
+  - GPS_telemetry_Stock_Car_onboard
+  - coastdown_sectors_1_4_11_14
+  - video_onboard_corner_radii

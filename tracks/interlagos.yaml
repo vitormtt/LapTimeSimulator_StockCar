@@ -1,0 +1,188 @@
+# Pista: Autódromo de Interlagos - Jose Carlos Pace
+# Fonte dos dados geométricos: site oficial do Autódromo, Wikipedia, literatura pública.
+# Layout: configuração utilizada pela Stock Car (sem chicane F1 do Senna).
+# Raios e comprimentos de setor são estimativas para simulação point-mass.
+# ATENÇÃO: CSVs de resultado de 10-11/03/2026 disponíveis em LapTimeSimulator_V2/src/results/
+#          Usar para calibração dos setores após implementação do solver.
+
+meta:
+  track_id: interlagos
+  official_name: "Autódromo José Carlos Pace"
+  city: "São Paulo"
+  state: SP
+  country: BR
+  lap_length_m: 4292.0
+  direction: anti-clockwise
+  surface: asphalt
+  fia_grade: 1
+  altitude_m: 785
+  elevation_delta_m: 56.0
+  coordinates:
+    lat: -23.7036
+    lon: -46.6997
+  season_appearances_2026:
+    - round: 3
+      date: "2026-04-26"
+      format: sprint_main
+    - round: 11
+      date: "2026-12-13"
+      format: sprint_main
+      tags: [super_final]
+  source_notes:
+    - "Comprimento Stock Car: ~4292 m (varia 4292-4309 conforme referencia)."
+    - "11 curvas, layout anti-horário."
+    - "Desnivel total: ~56 m (ponto alto S do Senna, ponto baixo Curva do Lago)."
+    - "Largura varia entre 12-15 m."
+    - "Setores de raio estimados - calibrar com telemetria MoTeC disponivel."
+
+# Layout em setores para o solver longitudinal.
+# Nota sobre elevacao: o desnivel de 56 m impacta aceleração/frenagem (~0.5 m/s2 nos setores inclinados).
+# Campo 'grade_pct' indica gradiente positivo (subida) ou negativo (descida) do setor.
+# Implementar correcao de gradiente no solver (Modulo 3).
+
+sectors:
+  - id: 1
+    name: "Reta dos boxes"
+    type: straight
+    length_m: 310.0
+    radius_m: null
+    grade_pct: 0.0
+    calibration_confidence: high
+
+  - id: 2
+    name: "S do Senna - entrada (Curva 1)"
+    type: corner
+    length_m: 80.0
+    radius_m: 85.0
+    grade_pct: -1.5
+    calibration_confidence: medium
+    notes: "Ponto de frenagem principal da pista, descida."
+
+  - id: 3
+    name: "S do Senna - saida (Curva 2)"
+    type: corner
+    length_m: 95.0
+    radius_m: 70.0
+    grade_pct: -2.0
+    calibration_confidence: medium
+
+  - id: 4
+    name: "Curva do Sol (Curva 3)"
+    type: corner
+    length_m: 140.0
+    radius_m: 130.0
+    grade_pct: -3.5
+    calibration_confidence: medium
+    notes: "Alta velocidade, pista em descida."
+
+  - id: 5
+    name: "Descida para o Lago"
+    type: straight
+    length_m: 370.0
+    radius_m: null
+    grade_pct: -4.0
+    calibration_confidence: medium
+
+  - id: 6
+    name: "Curva do Lago (Curva 4)"
+    type: corner
+    length_m: 170.0
+    radius_m: 160.0
+    grade_pct: -1.5
+    calibration_confidence: medium
+    notes: "Curva rapida de alta velocidade, ponto mais baixo do circuito."
+
+  - id: 7
+    name: "Subida para Mergulho"
+    type: straight
+    length_m: 190.0
+    radius_m: null
+    grade_pct: 3.5
+    calibration_confidence: medium
+
+  - id: 8
+    name: "Mergulho (Curva 5)"
+    type: corner
+    length_m: 115.0
+    radius_m: 80.0
+    grade_pct: 5.0
+    calibration_confidence: medium
+    notes: "Curva cega em subida, critica para carga aerodinamica."
+
+  - id: 9
+    name: "Reta do Mergulho"
+    type: straight
+    length_m: 260.0
+    radius_m: null
+    grade_pct: 2.0
+    calibration_confidence: medium
+
+  - id: 10
+    name: "Bico do Pato (Curva 6)"
+    type: corner
+    length_m: 90.0
+    radius_m: 45.0
+    grade_pct: 0.5
+    calibration_confidence: low
+    notes: "Freada forte, curva de baixa velocidade."
+
+  - id: 11
+    name: "Curva 7 - saida Bico do Pato"
+    type: corner
+    length_m: 100.0
+    radius_m: 55.0
+    grade_pct: 0.5
+    calibration_confidence: low
+
+  - id: 12
+    name: "Reta do Bico do Pato"
+    type: straight
+    length_m: 330.0
+    radius_m: null
+    grade_pct: -1.0
+    calibration_confidence: medium
+
+  - id: 13
+    name: "Cotovelo (Curva 8)"
+    type: corner
+    length_m: 110.0
+    radius_m: 40.0
+    grade_pct: 0.0
+    calibration_confidence: low
+    notes: "Freada tecnica, entrada para o complexo final."
+
+  - id: 14
+    name: "Subida dos Boxes - Curva 9"
+    type: corner
+    length_m: 140.0
+    radius_m: 55.0
+    grade_pct: 4.5
+    calibration_confidence: low
+
+  - id: 15
+    name: "Complexo final - Curvas 10-11"
+    type: corner
+    length_m: 290.0
+    radius_m: 65.0
+    grade_pct: 5.0
+    calibration_confidence: low
+    notes: "Sequencia de curvas em subida, critica para saida para reta dos boxes."
+
+  - id: 16
+    name: "Final da subida para boxes"
+    type: straight
+    length_m: 502.0
+    radius_m: null
+    grade_pct: 2.5
+    calibration_confidence: medium
+
+total_sectors: 16
+computed_length_m: 4292.0
+calibration_status: initial_estimate
+elevation_model: flat_approximation
+elevation_note: "Implementar correcao de gradiente no Modulo 3 (campo grade_pct disponivel)."
+calibration_priority_data:
+  - telemetry_csv_motec_20260310_20260311
+  - GPS_track_map_Stock_Car_onboard
+  - coastdown_sectors_1_5_7_9_12_16
+  - official_lap_time_reference_stock_car_2025_2026
