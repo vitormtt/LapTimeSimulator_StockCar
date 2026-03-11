@@ -1,0 +1,64 @@
+# Parâmetros do veículo SNG01 - Stock Car Pro Series 2026
+# Campos em official_layout: extraídos do Regulamento Técnico público (CBA 2026).
+# Campos em simulation_base e derivados: valores base de calibração para o simulador.
+# NÃO usar official_layout para homologação — consultar ficha oficial da CBA.
+
+meta:
+  vehicle_id: sng01
+  championship: stock_car_pro_series
+  season: 2026
+  source_status: baseline_calibration
+  official_sources:
+    - cba_regulamento_tecnico_2026
+    - cba_regulamento_desportivo_2026
+  notes:
+    - "mass_total_kg, aero_base e tyre_base são estimativas de calibração inicial."
+    - "Atualizar com dados de coastdown, dyno e telemetria MoTeC quando disponíveis."
+
+official_layout:
+  platform_code: SNG1
+  layout: front_engine_rear_transaxle
+  driven_axle: rear
+  gearbox_supplier: Xtrac
+  ecu: MoTeC_M142
+  driver_reference_mass_kg: 85.0
+  vehicle_min_mass_kg: null
+  vehicle_min_mass_note: "Definido pela ficha de homologação ou boletim BOP da CBA."
+
+simulation_base:
+  mass_total_kg: 1380.0
+  wheelbase_m: 2.820
+  cg_to_front_axle_m: 1.350
+  cg_to_rear_axle_m: 1.470
+  yaw_inertia_kgm2: 1850.0
+  track_front_m: 1.680
+  track_rear_m: 1.680
+
+aero_base:
+  frontal_area_m2: 2.10
+  drag_coefficient: 0.42
+  lift_coefficient: -0.85
+  air_density_kg_per_m3: 1.225
+  note: "Cd e Cl são estimativas flat. Substituir por mapa vs. ride-height após aerodinâmica."
+
+powertrain_base:
+  max_power_kw: 430.0
+  driveline_efficiency: 0.92
+  note: "Substituir por LookupTable RPM x Torque quando mapa de dyno disponível."
+
+tyre_base:
+  mu_longitudinal: 1.70
+  mu_lateral: 1.85
+  model: friction_circle_constant
+  note: "Evoluir para Pacejka MF 5.2 com dados de telemetria ou FSAE TTC equivalente."
+
+resistance_base:
+  rolling_resistance_c0_n: 180.0
+  rolling_resistance_c1_n_per_mps: 6.0
+  note: "Calibrar via procedimento coastdown SAE J2263 em pista reta."
+
+calibration_priority:
+  phase_1: [drag_coefficient, rolling_resistance_c0_n, rolling_resistance_c1_n_per_mps]
+  phase_2: [powertrain_map, driveline_efficiency]
+  phase_3: [mu_longitudinal, mu_lateral, pacejka_coefficients]
+  phase_4: [aero_map_vs_ride_height]

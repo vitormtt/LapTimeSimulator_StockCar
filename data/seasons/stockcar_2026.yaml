@@ -1,0 +1,141 @@
+# Calendário canônico BRB Stock Car Pro Series 2026
+# Fonte primária: CBA Regulamento Desportivo 2026 + comunicados oficiais da Stock Car.
+# Última atualização: 2026-03-11
+# Alterações aplicadas:
+#   - Etapa 2 atualizada de Santa Cruz do Sul para Cascavel (comunicado oficial Stock Car).
+#   - Evento 08/11 Interlagos removido (programação F4 Brasil, não etapa Stock Pro).
+#   - Etapa 9 marcada como endurance_3h conforme regulamento desportivo.
+#   - Velopark: city corrigida para Nova Santa Rita, RS.
+
+season: 2026
+series: BRB Stock Car Pro Series
+round_count: 11
+championship_administrator: CBA
+regulation_refs:
+  - cba_regulamento_desportivo_2026
+  - cba_regulamento_tecnico_2026
+
+weekend_formats:
+  sprint_main:
+    description: "Sprint (sábado) + Corrida Principal (domingo)"
+    sprint:
+      nominal_day: saturday
+      duration_min: 30
+      plus_one_lap: true
+    main:
+      nominal_day: sunday
+      duration_min: 50
+      plus_one_lap: true
+    note: "Horários e duração sujeitos ao RPP de cada etapa."
+  endurance_3h:
+    description: "Prova endurance única com troca de piloto obrigatória"
+    race:
+      duration_h: 3
+      plus_one_lap: true
+      driver_change_mandatory: true
+    note: "Regulamento específico da etapa endurance a confirmar no RPP."
+
+calendar:
+  - round: 1
+    date: "2026-03-08"
+    track_id: curvelo
+    circuit: Circuito dos Cristais
+    city: Curvelo
+    state: MG
+    country: BR
+    format: sprint_main
+
+  - round: 2
+    date: "2026-03-29"
+    track_id: cascavel
+    circuit: "Autódromo Internacional de Cascavel Zilmar Beux"
+    city: Cascavel
+    state: PR
+    country: BR
+    format: sprint_main
+    notes:
+      - "Substituiu Santa Cruz do Sul por comunicado oficial da Stock Car."
+
+  - round: 3
+    date: "2026-04-26"
+    track_id: interlagos
+    circuit: "Autódromo de Interlagos"
+    city: "São Paulo"
+    state: SP
+    country: BR
+    format: sprint_main
+
+  - round: 4
+    date: "2026-05-17"
+    track_id: goiania
+    circuit: "Autódromo Internacional Ayrton Senna"
+    city: "Goiânia"
+    state: GO
+    country: BR
+    format: sprint_main
+
+  - round: 5
+    date: "2026-06-13"
+    track_id: cuiaba
+    circuit: "Autódromo Internacional de Mato Grosso"
+    city: "Cuiabá"
+    state: MT
+    country: BR
+    format: sprint_main
+    tags: [night_event]
+
+  - round: 6
+    date: "2026-07-26"
+    track_id: velocitta
+    circuit: Autódromo Velocitta
+    city: "Mogi Guaçu"
+    state: SP
+    country: BR
+    format: sprint_main
+
+  - round: 7
+    date: "2026-08-09"
+    track_id: chapeco
+    circuit: "Autódromo Internacional de Chapecó"
+    city: "Chapecó"
+    state: SC
+    country: BR
+    format: sprint_main
+
+  - round: 8
+    date: "2026-09-27"
+    track_id: brasilia
+    circuit: "Autódromo Internacional Nelson Piquet"
+    city: "Brasília"
+    state: DF
+    country: BR
+    format: sprint_main
+    tags: [corrida_do_milhao]
+
+  - round: 9
+    date: "2026-10-18"
+    track_id: goiania
+    circuit: "Autódromo Internacional Ayrton Senna"
+    city: "Goiânia"
+    state: GO
+    country: BR
+    format: endurance_3h
+
+  - round: 10
+    date: "2026-11-15"
+    track_id: velopark
+    circuit: Velopark
+    city: "Nova Santa Rita"
+    state: RS
+    country: BR
+    format: sprint_main
+
+  - round: 11
+    date: "2026-12-13"
+    track_id: interlagos
+    circuit: "Autódromo de Interlagos"
+    city: "São Paulo"
+    state: SP
+    country: BR
+    format: sprint_main
+    tags: [super_final]
