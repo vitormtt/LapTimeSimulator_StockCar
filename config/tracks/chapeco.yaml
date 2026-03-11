@@ -1,0 +1,35 @@
+# Autódromo Internacional de Chapecó — Chapecó/SC
+# Etapa 08 (06/09) — ESTREIA na Stock Car 2026
+
+track:
+  name: "Autódromo Internacional de Chapecó"
+  nickname: "Chapecó"
+  city: "Chapecó"
+  state: "SC"
+  country: "Brasil"
+  lap_length_m: 3200.0      # A validar — circuito novo na categoria
+  turns: 10
+  direction: "clockwise"
+  altitude_m: 660
+
+surface:
+  grip_nominal: 0.95        # Ligeira penalidade por ser pista nova (menor borracha depositada)
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 22.0
+  temp_track_c: 38.0
+  humidity_pct: 67.0
+
+sectors:
+  - id: 1
+    length_m: 1080.0
+  - id: 2
+    length_m: 1040.0
+  - id: 3
+    length_m: 1080.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

@@ -1,0 +1,35 @@
+# Circuito dos Cristais — Curvelo/MG
+# Etapa 01 (08/03) — BRB Stock Car 2026
+
+track:
+  name: "Circuito dos Cristais"
+  nickname: "Curvelo"
+  city: "Curvelo"
+  state: "MG"
+  country: "Brasil"
+  lap_length_m: 3800.0      # A validar com dados oficiais
+  turns: 12
+  direction: "clockwise"
+  altitude_m: 700
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 27.0
+  temp_track_c: 44.0
+  humidity_pct: 60.0
+
+sectors:
+  - id: 1
+    length_m: 1280.0
+  - id: 2
+    length_m: 1250.0
+  - id: 3
+    length_m: 1270.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

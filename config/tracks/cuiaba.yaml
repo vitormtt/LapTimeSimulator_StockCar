@@ -1,0 +1,36 @@
+# Autódromo Internacional de Mato Grosso — Cuiabá/MT
+# Etapa 05 (13/06) — Corrida Noturna — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Internacional de Mato Grosso"
+  nickname: "Cuiabá"
+  city: "Cuiabá"
+  state: "MT"
+  country: "Brasil"
+  lap_length_m: 2950.0      # A validar
+  turns: 10
+  direction: "clockwise"
+  altitude_m: 165
+  night_race: true          # Corrida noturna
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 25.0          # Temperatura noturna estimada
+  temp_track_c: 35.0
+  humidity_pct: 70.0
+
+sectors:
+  - id: 1
+    length_m: 1000.0
+  - id: 2
+    length_m: 950.0
+  - id: 3
+    length_m: 1000.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

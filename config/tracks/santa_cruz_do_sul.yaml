@@ -1,0 +1,35 @@
+# Autódromo Internacional de Santa Cruz do Sul — Santa Cruz do Sul/RS
+# Etapa 02 (29/03) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Internacional de Santa Cruz do Sul"
+  nickname: "Santa Cruz do Sul"
+  city: "Santa Cruz do Sul"
+  state: "RS"
+  country: "Brasil"
+  lap_length_m: 3400.0      # A validar
+  turns: 11
+  direction: "clockwise"
+  altitude_m: 40
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 23.0
+  temp_track_c: 38.0
+  humidity_pct: 68.0
+
+sectors:
+  - id: 1
+    length_m: 1150.0
+  - id: 2
+    length_m: 1100.0
+  - id: 3
+    length_m: 1150.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

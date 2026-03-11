@@ -1,0 +1,54 @@
+# Chevrolet Tracker — BRB Stock Car Pro Series SNG01 (2026)
+# Parâmetros a serem validados com dados oficiais da categoria
+
+vehicle:
+  name: "Chevrolet Tracker"
+  manufacturer: "Chevrolet"
+  generation: "SNG01"
+  season: 2026
+
+mass:
+  total_kg: 1100.0          # Peso mínimo regulamentar (kg)
+  driver_kg: 80.0           # Peso padrão do piloto (kg) — ajustar por piloto
+  fuel_capacity_l: 90.0     # Capacidade do tanque (litros)
+  fuel_density: 0.745       # Densidade do combustível (kg/l) — gasolina
+
+geometry:
+  wheelbase_m: 2.58         # Entre-eixos (m) — a validar
+  track_front_m: 1.55       # Bitola dianteira (m)
+  track_rear_m: 1.55        # Bitola traseira (m)
+  cg_height_m: 0.45         # Altura do CG (m) — estimativa
+  cg_bias_front: 0.45       # Distribuição de peso dianteira (0–1)
+
+powertrain:
+  drive_type: "RWD"         # Tração traseira
+  max_power_kw: 373.0       # ~500 cv
+  max_torque_nm: 550.0      # Torque máximo estimado (Nm)
+  gearbox: "XTrac P1529"    # Câmbio sequencial 6 marchas
+  gear_ratios: [3.08, 2.05, 1.52, 1.17, 0.94, 0.79]  # Placeholder
+  final_drive_ratio: 3.73   # Placeholder
+
+aerodynamics:
+  cx: 0.38                  # Coeficiente de arrasto — estimativa
+  frontal_area_m2: 2.45     # Área frontal (m²)
+  cl_front: 0.30            # Coeficiente de sustentação dianteira — estimativa
+  cl_rear: 0.50             # Coeficiente de sustentação traseira — estimativa
+
+tires:
+  supplier: "Hankook"       # Fornecedor único da categoria
+  compound: "slick"         # Composição padrão
+  width_front_mm: 270       # Largura do pneu dianteiro (mm) — estimativa
+  width_rear_mm: 270        # Largura do pneu traseiro (mm) — estimativa
+  radius_m: 0.335           # Raio do pneu (m) — estimativa
+
+suspension:
+  spring_rate_front_nm: 35000.0   # Rigidez da mola dianteira (N/m)
+  spring_rate_rear_nm: 30000.0    # Rigidez da mola traseira (N/m)
+  damper_front_ns_m: 3500.0       # Amortecimento dianteiro (Ns/m)
+  damper_rear_ns_m: 3000.0        # Amortecimento traseiro (Ns/m)
+  arb_front_nm_rad: 15000.0       # Rigidez barra estabilizadora dianteira (Nm/rad)
+  arb_rear_nm_rad: 10000.0        # Rigidez barra estabilizadora traseira (Nm/rad)
+
+brakes:
+  bias_front: 0.60          # Distribuição de frenagem dianteira
+  max_decel_g: 2.2          # Desaceleração máxima estimada (g)

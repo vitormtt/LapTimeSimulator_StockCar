@@ -1,0 +1,35 @@
+# Velopark — Novo Hamburgo/RS
+# Etapa 11 (11/11) — BRB Stock Car 2026
+
+track:
+  name: "Velopark"
+  nickname: "Velopark"
+  city: "Novo Hamburgo"
+  state: "RS"
+  country: "Brasil"
+  lap_length_m: 2600.0
+  turns: 10
+  direction: "clockwise"
+  altitude_m: 30
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 22.0
+  temp_track_c: 36.0
+  humidity_pct: 70.0
+
+sectors:
+  - id: 1
+    length_m: 870.0
+  - id: 2
+    length_m: 870.0
+  - id: 3
+    length_m: 860.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Dados brutos de telemetria (não versionar)
+data/raw/
+data/processed/
+*.ld
+*.ldx
+
+# Outputs gerados
+outputs/
+*.pdf
+*.png
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# VS Code
+.vscode/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# macOS
+.DS_Store

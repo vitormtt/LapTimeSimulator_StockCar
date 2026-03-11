@@ -1,0 +1,37 @@
+# Autódromo Internacional Ayrton Senna — Goiânia/GO
+# Etapa 04 (17/05) e Etapa 10 — Endurance 3h (18/10) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Internacional Ayrton Senna"
+  nickname: "Goiânia"
+  city: "Goiânia"
+  state: "GO"
+  country: "Brasil"
+  lap_length_m: 3806.0
+  turns: 11
+  direction: "clockwise"
+  altitude_m: 741
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 30.0
+  temp_track_c: 50.0
+  humidity_pct: 55.0
+
+sectors:
+  - id: 1
+    length_m: 1300.0
+  - id: 2
+    length_m: 1250.0
+  - id: 3
+    length_m: 1256.0
+
+endurance_mode: true        # Habilita troca de pilotos e estratégia de longa distância
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

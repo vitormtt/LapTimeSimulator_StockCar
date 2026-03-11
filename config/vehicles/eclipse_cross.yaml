@@ -1,0 +1,53 @@
+# Mitsubishi Eclipse Cross — BRB Stock Car Pro Series SNG01 (2026)
+
+vehicle:
+  name: "Mitsubishi Eclipse Cross"
+  manufacturer: "Mitsubishi"
+  generation: "SNG01"
+  season: 2026
+
+mass:
+  total_kg: 1100.0
+  driver_kg: 80.0
+  fuel_capacity_l: 90.0
+  fuel_density: 0.745
+
+geometry:
+  wheelbase_m: 2.67
+  track_front_m: 1.55
+  track_rear_m: 1.55
+  cg_height_m: 0.45
+  cg_bias_front: 0.45
+
+powertrain:
+  drive_type: "RWD"
+  max_power_kw: 373.0
+  max_torque_nm: 550.0
+  gearbox: "XTrac P1529"
+  gear_ratios: [3.08, 2.05, 1.52, 1.17, 0.94, 0.79]
+  final_drive_ratio: 3.73
+
+aerodynamics:
+  cx: 0.38
+  frontal_area_m2: 2.52
+  cl_front: 0.30
+  cl_rear: 0.50
+
+tires:
+  supplier: "Hankook"
+  compound: "slick"
+  width_front_mm: 270
+  width_rear_mm: 270
+  radius_m: 0.335
+
+suspension:
+  spring_rate_front_nm: 35000.0
+  spring_rate_rear_nm: 30000.0
+  damper_front_ns_m: 3500.0
+  damper_rear_ns_m: 3000.0
+  arb_front_nm_rad: 15000.0
+  arb_rear_nm_rad: 10000.0
+
+brakes:
+  bias_front: 0.60
+  max_decel_g: 2.2

@@ -1,0 +1,35 @@
+# Autódromo Zilmar Beux — Cascavel/PR
+# Etapa 07 (09/08) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Zilmar Beux"
+  nickname: "Cascavel"
+  city: "Cascavel"
+  state: "PR"
+  country: "Brasil"
+  lap_length_m: 3400.0
+  turns: 9
+  direction: "clockwise"
+  altitude_m: 760
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 24.0
+  temp_track_c: 40.0
+  humidity_pct: 65.0
+
+sectors:
+  - id: 1
+    length_m: 1150.0
+  - id: 2
+    length_m: 1100.0
+  - id: 3
+    length_m: 1150.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

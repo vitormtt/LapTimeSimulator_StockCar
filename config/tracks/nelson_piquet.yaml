@@ -1,0 +1,35 @@
+# Autódromo Internacional Nelson Piquet — Brasília/DF
+# Etapa 09 (27/09) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Internacional Nelson Piquet"
+  nickname: "Brasília"
+  city: "Brasília"
+  state: "DF"
+  country: "Brasil"
+  lap_length_m: 3800.0      # A validar
+  turns: 11
+  direction: "clockwise"
+  altitude_m: 1100
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 26.0
+  temp_track_c: 43.0
+  humidity_pct: 50.0
+
+sectors:
+  - id: 1
+    length_m: 1300.0
+  - id: 2
+    length_m: 1200.0
+  - id: 3
+    length_m: 1300.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

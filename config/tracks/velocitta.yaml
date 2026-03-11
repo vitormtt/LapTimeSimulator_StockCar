@@ -1,0 +1,35 @@
+# Autódromo Velocitta — Mogi Guaçu/SP
+# Etapa 06 (26/07) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo Velocitta"
+  nickname: "Velocitta"
+  city: "Mogi Guaçu"
+  state: "SP"
+  country: "Brasil"
+  lap_length_m: 3583.0
+  turns: 10
+  direction: "clockwise"
+  altitude_m: 620
+
+surface:
+  grip_nominal: 1.0
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 26.0
+  temp_track_c: 42.0
+  humidity_pct: 60.0
+
+sectors:
+  - id: 1
+    length_m: 1200.0
+  - id: 2
+    length_m: 1100.0
+  - id: 3
+    length_m: 1283.0
+
+reference_lap:
+  best_lap_s: null
+  session: null
+  driver: null

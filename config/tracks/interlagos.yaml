@@ -1,0 +1,35 @@
+# Autódromo de Interlagos — São Paulo/SP
+# Etapas 03 (26/04) e 12 — Super Final (13/12) — BRB Stock Car 2026
+
+track:
+  name: "Autódromo José Carlos Pace"
+  nickname: "Interlagos"
+  city: "São Paulo"
+  state: "SP"
+  country: "Brasil"
+  lap_length_m: 4309.0
+  turns: 15
+  direction: "anti-clockwise"
+  altitude_m: 785
+
+surface:
+  grip_nominal: 1.0         # Fator de aderência normalizado
+  surface_type: "asphalt"
+
+weather_reference:
+  temp_air_c: 28.0
+  temp_track_c: 45.0
+  humidity_pct: 65.0
+
+sectors:
+  - id: 1
+    length_m: 1540.0
+  - id: 2
+    length_m: 1420.0
+  - id: 3
+    length_m: 1349.0
+
+reference_lap:
+  best_lap_s: null          # Preencher com dado real da temporada
+  session: null
+  driver: null
